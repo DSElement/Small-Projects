@@ -1,0 +1,11 @@
+(O’s turn)
+
+color = +1 	O wins	+10	+10 → good	O sees this as great
+color = +1	X wins	-10	-10 → bad	O sees this as terrible
+
+
+
+(X’s turn)
+
+color = -1 	O wins	+10	-10 → bad	X sees O’s win as terrible
+color = -1	X wins	-10	+10 → good	X sees their win as great
