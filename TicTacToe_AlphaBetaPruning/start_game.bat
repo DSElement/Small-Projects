@@ -1,6 +1,6 @@
 @ECHO OFF
 ECHO Compile in progress.....
-gcc -Wall -o game_xsi0 game_xsi0.c -fopenmp
+gcc -Wall -o game_xsi0 game_xsi0.c utils.c -fopenmp
 
 IF ERRORLEVEL 1 (
     ECHO Compilation failed. Here are the errors:
