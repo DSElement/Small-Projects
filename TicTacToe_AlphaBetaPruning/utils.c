@@ -1,5 +1,11 @@
 #include "utils.h"
 
+typedef struct{
+    int bestScore;
+    int moveRow;
+    int moveCol;
+} ScoreMovePair_t;
+
 // Function to initialize the board with empty spaces
 void initializeBoard(Board *board) {
     for (int i = 0; i < board->size; i++) {
@@ -143,8 +149,7 @@ int negamax(Board *board, int depth, int alpha, int beta, int maxDepth, int colo
     return alpha;
 }
 
-
-void computerMove(Board *board, char symbol) {
+void computerMove_DEPRECATED(Board *board, char symbol) {
     int bestScore = LOWER_LIMIT;
     int moveRow = -1, moveCol = -1;
     int maxDepth = MAXDEPTH;
@@ -160,7 +165,7 @@ void computerMove(Board *board, char symbol) {
             if (board->cells[i][j] == ' ') {
                 board->cells[i][j] = symbol;
 
-                int score = -negamax(board, 1, -beta, -alpha, maxDepth, -color);
+                int score = -negamax(board, 0, -beta, -alpha, maxDepth, -color);
 
                 board->cells[i][j] = ' ';
 
@@ -177,7 +182,7 @@ void computerMove(Board *board, char symbol) {
     board->cells[moveRow][moveCol] = symbol;
 }
 
-void computerMoveParallel(Board *board, char symbol) {
+void computerMoveParallel_DEPRECATED(Board *board, char symbol) {
     int globalBestScore = LOWER_LIMIT;
     int globalMoveRow = -1, globalMoveCol = -1;
 
@@ -209,7 +214,7 @@ void computerMoveParallel(Board *board, char symbol) {
                 if (boards[rank]->cells[i][j] == ' ') {
                     boards[rank]->cells[i][j] = symbol;
 
-                    int score = -negamax(boards[rank], 1, -beta, -alpha, MAXDEPTH, -color);
+                    int score = -negamax(boards[rank], 0, -beta, -alpha, MAXDEPTH, -color);
 
                     boards[rank]->cells[i][j] = ' ';
 
@@ -240,6 +245,125 @@ void computerMoveParallel(Board *board, char symbol) {
     }
     board->cells[globalMoveRow][globalMoveCol] = symbol;
 
+    for (int i = 0; i < NUMTHREADS; i++) {
+        freeAllocatedBoard(boards[i]);
+    }
+}
+
+int minimax(Board *board, int depth, int isMaximizing, int alpha, int beta, int maxDepth, int color) {
+    if (checkWin(board, 'O')) return (10 - depth) * color;
+    if (checkWin(board, 'X')) return (depth - 10) * color;
+    if (isBoardFull(board) || depth == maxDepth) return 0;
+
+    if (isMaximizing) {
+        int bestScore = LOWER_LIMIT;
+        for (int i = 0; i < board->size; i++) {
+            for (int j = 0; j < board->size; j++) {
+                if (board->cells[i][j] == ' ') {
+                    board->cells[i][j] = (color == 1) ? 'O' : 'X';
+                    int score = minimax(board, depth + 1, 0, alpha, beta, maxDepth, color);
+                    board->cells[i][j] = ' ';
+                    bestScore = score > bestScore ? score : bestScore;
+                    alpha = alpha > bestScore ? alpha : bestScore;
+                    if (beta <= alpha) return bestScore;
+                }
+            }
+        }
+        return bestScore;
+    } else {
+        int bestScore = UPPER_LIMIT;
+        for (int i = 0; i < board->size; i++) {
+            for (int j = 0; j < board->size; j++) {
+                if (board->cells[i][j] == ' ') {
+                    board->cells[i][j] = (color == 1) ? 'X' : 'O';
+                    int score = minimax(board, depth + 1, 1, alpha, beta, maxDepth, color);
+                    board->cells[i][j] = ' ';
+                    bestScore = score < bestScore ? score : bestScore;
+                    beta = beta < bestScore ? beta : bestScore;
+                    if (beta <= alpha) return bestScore;
+                }
+            }
+        }
+        return bestScore;
+    }
+}
+
+void computerMove(Board *board, char symbol) {
+    int bestScore = LOWER_LIMIT;
+    int moveRow = -1, moveCol = -1;
+
+    int color = (symbol == 'O') ? 1 : -1;
+
+    for (int i = 0; i < board->size; i++) {
+        for (int j = 0; j < board->size; j++) {
+            if (board->cells[i][j] == ' ') {
+                board->cells[i][j] = symbol;
+                int score = minimax(board, 0, 0, LOWER_LIMIT, UPPER_LIMIT, MAXDEPTH, color);
+                board->cells[i][j] = ' ';
+                if (score > bestScore) {
+                    bestScore = score;
+                    moveRow = i;
+                    moveCol = j;
+                }
+            }
+        }
+    }
+    board->cells[moveRow][moveCol] = symbol;
+}
+
+void computerMoveParallel(Board *board, char symbol) {
+
+    int color = (symbol == 'O') ? 1 : -1;
+
+    Board *boards[NUMTHREADS];
+    for (int i = 0; i < NUMTHREADS; i++) {
+        boards[i] = boardClone(board);
+    }
+
+    int globalMoveRow = -1, globalMoveCol = -1;
+    int globalBestScore = LOWER_LIMIT;
+
+    ScoreMovePair_t **scoresMoves = (ScoreMovePair_t **)malloc(NUMTHREADS * sizeof(ScoreMovePair_t *));
+    for (int i = 0; i < NUMTHREADS; i++) {
+        scoresMoves[i] = (ScoreMovePair_t *)malloc(sizeof(ScoreMovePair_t));
+        scoresMoves[i]->bestScore = LOWER_LIMIT;
+        scoresMoves[i]->moveRow = -1;
+        scoresMoves[i]->moveCol = -1;
+    }
+
+    #pragma omp parallel num_threads(NUMTHREADS) default(none) shared(board, symbol, color, boards, globalMoveRow, globalMoveCol, globalBestScore, scoresMoves)
+    {
+        int rank = omp_get_thread_num();
+        // schedule dynamic may be faster but it won't be deterministic
+        #pragma omp for schedule(static) collapse(2)
+        for (int i = 0; i < board->size; i++) {
+            for (int j = 0; j < board->size; j++) {
+                if (boards[rank]->cells[i][j] == ' ') {
+                    boards[rank]->cells[i][j] = symbol;
+                    int score = minimax(boards[rank], 0, 0, LOWER_LIMIT, UPPER_LIMIT, MAXDEPTH, color);
+                    boards[rank]->cells[i][j] = ' ';
+                    if (score > scoresMoves[rank]->bestScore) {
+                        scoresMoves[rank]->bestScore = score;
+                        scoresMoves[rank]->moveRow = i;
+                        scoresMoves[rank]->moveCol = j;
+                    }
+                }
+            }
+        }
+
+        #pragma omp single 
+        {
+            globalBestScore = LOWER_LIMIT;
+            for (int i = 0; i < NUMTHREADS; i++) {
+                if (scoresMoves[i]->bestScore > globalBestScore) {
+                    globalBestScore = scoresMoves[i]->bestScore;
+                    globalMoveRow = scoresMoves[i]->moveRow;
+                    globalMoveCol = scoresMoves[i]->moveCol;
+                }
+            }
+        }
+    }
+    board->cells[globalMoveRow][globalMoveCol] = symbol;
     for (int i = 0; i < NUMTHREADS; i++) {
         freeAllocatedBoard(boards[i]);
     }
@@ -320,12 +444,20 @@ void playComputerVsComputer(Board *board, int parallel, char *winner){
     struct timespec start, finish;
     double elapsed;
     clock_gettime(CLOCK_MONOTONIC, &start);
+    int firstMove = 0;
 
     while(1){
-        if (parallel) {
-            computerMoveParallel(board, 'X');
+        if (!firstMove){
+            firstMove = 1;
+            int firstMoveRow = board->size / 2;
+            int firstMoveCol = board->size / 2;
+            board->cells[firstMoveRow][firstMoveCol] = 'X';
         } else {
-            computerMove(board, 'X');
+            if (parallel) {
+                computerMoveParallel(board, 'X');
+            } else {
+                computerMove(board, 'X');
+            }
         }
     #ifdef DEBUG
         printBoard(board);

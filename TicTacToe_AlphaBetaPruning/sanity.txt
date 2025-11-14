@@ -1,3 +1,27 @@
+     1   2   3   4   5
+  1  O | X | O | X | O 
+    ---|---|---|---|---
+  2  X | O | X | O | X
+    ---|---|---|---|---
+  3  O | X | X | O | X
+    ---|---|---|---|---
+  4  O | X | O | X | O
+    ---|---|---|---|---
+  5  X | O | X | O | X
+
+
+       1   2   3   4   5
+  1  O | X | O | X | O
+    ---|---|---|---|---
+  2  X | O | X | O | X
+    ---|---|---|---|---
+  3  O | X | X | O | X
+    ---|---|---|---|---
+  4  O | X | O | X | O
+    ---|---|---|---|---
+  5  X | O | X | O | X
+
+  
 PS C:\Users\field\Faculta\APD\proiect_1> .\start_game.bat
 Compile in progress.....
 Compilation done

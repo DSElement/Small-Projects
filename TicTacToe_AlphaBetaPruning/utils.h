@@ -8,7 +8,7 @@
 #define LOWER_LIMIT -1000
 #define UPPER_LIMIT 1000
 #define NUMTHREADS 8
-#define MAXDEPTH 7
+#define MAXDEPTH 6
 #define BOARDMINSIZE 2
 #define BOARDMAXSIZE 15
 
