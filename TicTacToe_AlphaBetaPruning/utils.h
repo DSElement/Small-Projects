@@ -11,6 +11,7 @@
 #define MAXDEPTH 6
 #define BOARDMINSIZE 2
 #define BOARDMAXSIZE 15
+#define PARALLELVERSION 2
 
 
 typedef struct {
@@ -23,7 +24,7 @@ void printBoard(Board *board);
 void playerMove(Board *board, char symbol);
 void generateMoveOrder(int size, int moves[][2], int *count);
 void computerMove(Board *board, char symbol);
-void computerMoveParallel(Board *board, char symbol);
+void computerMoveParallel(Board *board, char symbol, int parallelVersion);
 void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves);
 void playComputerVsHuman(Board *board, int parallel, char *winner, int *moves);
 void playComputerVsComputer(Board *board, int parallel, char *winner);

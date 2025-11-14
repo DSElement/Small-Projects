@@ -311,7 +311,7 @@ void computerMove(Board *board, char symbol) {
     board->cells[moveRow][moveCol] = symbol;
 }
 
-void computerMoveParallel(Board *board, char symbol) {
+void computerMoveParallelV1(Board *board, char symbol) {
 
     int color = (symbol == 'O') ? 1 : -1;
 
@@ -369,6 +369,82 @@ void computerMoveParallel(Board *board, char symbol) {
     }
 }
 
+
+void computerMoveParallelV2(Board *board, char symbol){
+    int color = (symbol == 'O') ? 1 : -1;
+
+    Board *boards[NUMTHREADS];
+    for (int i = 0; i < NUMTHREADS; i++) {
+        boards[i] = boardClone(board);
+    }
+
+    int globalMoveRow = -1, globalMoveCol = -1;
+    int globalBestScore = LOWER_LIMIT;
+
+    ScoreMovePair_t **scoresMoves = (ScoreMovePair_t **)malloc(NUMTHREADS * sizeof(ScoreMovePair_t *));
+    for (int i = 0; i < NUMTHREADS; i++) {
+        scoresMoves[i] = (ScoreMovePair_t *)malloc(sizeof(ScoreMovePair_t));
+        scoresMoves[i]->bestScore = LOWER_LIMIT;
+        scoresMoves[i]->moveRow = -1;
+        scoresMoves[i]->moveCol = -1;
+    }
+
+    #pragma omp parallel num_threads(NUMTHREADS)
+    {
+        #pragma omp single
+        for (int i = 0; i < board->size; i++) {
+            for (int j = 0; j < board->size; j++) {
+                #pragma omp task shared(boards, scoresMoves, symbol, color) firstprivate(i, j)
+                {
+                    int rank = omp_get_thread_num();
+                    if (boards[rank]->cells[i][j] == ' ') {
+                        boards[rank]->cells[i][j] = symbol;
+                        int score = minimax(boards[rank], 0, 0, LOWER_LIMIT, UPPER_LIMIT, MAXDEPTH, color);
+                        boards[rank]->cells[i][j] = ' ';
+                        if (score > scoresMoves[rank]->bestScore) {
+                            scoresMoves[rank]->bestScore = score;
+                            scoresMoves[rank]->moveRow = i;
+                            scoresMoves[rank]->moveCol = j;
+                        }
+                    }
+                }
+            }
+        }
+        #pragma omp taskwait
+        #pragma omp single 
+        {
+            globalBestScore = LOWER_LIMIT;
+            for (int i = 0; i < NUMTHREADS; i++) {
+                if (scoresMoves[i]->bestScore > globalBestScore) {
+                    globalBestScore = scoresMoves[i]->bestScore;
+                    globalMoveRow = scoresMoves[i]->moveRow;
+                    globalMoveCol = scoresMoves[i]->moveCol;
+                }
+            }
+        }
+    }
+    board->cells[globalMoveRow][globalMoveCol] = symbol;
+    for (int i = 0; i < NUMTHREADS; i++) {
+        freeAllocatedBoard(boards[i]);
+    }
+}
+
+void computerMoveParallel(Board *board, char symbol, int parallelVersion){
+    switch (parallelVersion){
+        case 1:
+            computerMoveParallelV1(board, symbol);
+            break;
+        case 2:
+            computerMoveParallelV2(board, symbol);
+            break;
+        default:
+            fprintf(stderr, "Invalid parallel version specified\n");
+            exit(EXIT_FAILURE);
+            break;
+    }
+    
+}
+
 void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves){
     while (1) {
     
@@ -384,7 +460,7 @@ void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves){
         }
 
         if (parallel){
-            computerMoveParallel(board, 'O');
+            computerMoveParallel(board, 'O', PARALLELVERSION);
             (*moves)++;
         } else {
             computerMove(board, 'O');
@@ -402,10 +478,11 @@ void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves){
 }
 
 
+
 void playComputerVsHuman(Board *board, int parallel, char *winner, int *moves){
     while (1){
         if (parallel) {
-            computerMoveParallel(board, 'X');
+            computerMoveParallel(board, 'X', PARALLELVERSION);
             (*moves)++;
         } else {
             computerMove(board, 'X');
@@ -454,7 +531,7 @@ void playComputerVsComputer(Board *board, int parallel, char *winner){
             board->cells[firstMoveRow][firstMoveCol] = 'X';
         } else {
             if (parallel) {
-                computerMoveParallel(board, 'X');
+                computerMoveParallel(board, 'X', PARALLELVERSION);
             } else {
                 computerMove(board, 'X');
             }
@@ -473,7 +550,7 @@ void playComputerVsComputer(Board *board, int parallel, char *winner){
         }
 
         if (parallel){
-            computerMoveParallel(board, 'O');
+            computerMoveParallel(board, 'O', PARALLELVERSION);
         } else {
             computerMove(board, 'O');
         }
