@@ -8,10 +8,10 @@
 #define LOWER_LIMIT -1000
 #define UPPER_LIMIT 1000
 #define NUMTHREADS 8
-#define MAXDEPTH 6
+#define MAXDEPTH 7
 #define BOARDMINSIZE 2
 #define BOARDMAXSIZE 15
-#define PARALLELVERSION 2
+#define PARALLELVERSION 1
 
 
 typedef struct {

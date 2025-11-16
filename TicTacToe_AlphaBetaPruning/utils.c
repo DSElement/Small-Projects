@@ -363,6 +363,12 @@ void computerMoveParallelV1(Board *board, char symbol) {
             }
         }
     }
+
+    for (int i = 0; i<NUMTHREADS; i++){
+        free(scoresMoves[i]);
+    }
+    free(scoresMoves);
+
     board->cells[globalMoveRow][globalMoveCol] = symbol;
     for (int i = 0; i < NUMTHREADS; i++) {
         freeAllocatedBoard(boards[i]);
@@ -423,6 +429,12 @@ void computerMoveParallelV2(Board *board, char symbol){
             }
         }
     }
+
+    for (int i = 0; i<NUMTHREADS; i++){
+        free(scoresMoves[i]);
+    }
+    free(scoresMoves);
+
     board->cells[globalMoveRow][globalMoveCol] = symbol;
     for (int i = 0; i < NUMTHREADS; i++) {
         freeAllocatedBoard(boards[i]);
