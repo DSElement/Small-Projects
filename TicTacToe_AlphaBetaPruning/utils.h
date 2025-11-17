@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -26,3 +29,5 @@ void computerMoveParallel(Board *board, char symbol, int parallelVersion, int *t
 void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves, int parallelVersion, int numThreads, int maxDepth);
 void playComputerVsHuman(Board *board, int parallel, char *winner, int *moves, int parallelVersion, int numThreads, int maxDepth);
 void playComputerVsComputer(Board *board, int parallel, char *winner, int parallelVersion, int numThreads, int maxDepth, FILE *outputFile);
+
+#endif // UTILS_H

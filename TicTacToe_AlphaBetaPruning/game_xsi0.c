@@ -1,8 +1,7 @@
 #include "utils.h"
 
 
-int main() {
-/*
+void run_game(){
     Board board;
     printf("Enter the size of the board (N): ");
 
@@ -100,16 +99,16 @@ int main() {
         free(board.cells[i]);
     }
     free(board.cells);
-*/
+}
 
-
+void run_benchmarks(){
     //Performance measurements: For different sizes of the board (N>4) and different depths of the 
     //minimax search algorithm, for different number of threads (2, 4, 8), with and without parallelism:
 
     FILE *outputFile = fopen("results.csv", "w");
     if (!outputFile) {
         fprintf(stderr, "Error opening file for writing results.\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     fprintf(outputFile, "BoardSize,MaxDepth,ThreadCount,WithParallelism,ParallelVersion,RunTime,AverageTimePerMove\n");
 
@@ -170,6 +169,9 @@ int main() {
     }
 
     fclose(outputFile);
+}
 
+int main() {
+    run_game();
     return 0;
 }
