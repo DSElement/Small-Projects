@@ -1,9 +1,12 @@
+#define _POSIX_C_SOURCE 200112L
 #include "utils.h"
+#include <time.h>
 
 typedef struct{
     int bestScore;
     int moveRow;
     int moveCol;
+    //char pad[64 - 3 * sizeof(int)];  // Supposed padding to avoid false sharing, no difference in practice 
 } ScoreMovePair_t;
 
 // Function to initialize the board with empty spaces
@@ -288,7 +291,7 @@ int minimax(Board *board, int depth, int isMaximizing, int alpha, int beta, int 
     }
 }
 
-void computerMove(Board *board, char symbol) {
+void computerMove(Board *board, char symbol, int *totalMoves, int maxDepth) {
     int bestScore = LOWER_LIMIT;
     int moveRow = -1, moveCol = -1;
 
@@ -298,7 +301,7 @@ void computerMove(Board *board, char symbol) {
         for (int j = 0; j < board->size; j++) {
             if (board->cells[i][j] == ' ') {
                 board->cells[i][j] = symbol;
-                int score = minimax(board, 0, 0, LOWER_LIMIT, UPPER_LIMIT, MAXDEPTH, color);
+                int score = minimax(board, 0, 0, LOWER_LIMIT, UPPER_LIMIT, maxDepth, color);
                 board->cells[i][j] = ' ';
                 if (score > bestScore) {
                     bestScore = score;
@@ -309,9 +312,10 @@ void computerMove(Board *board, char symbol) {
         }
     }
     board->cells[moveRow][moveCol] = symbol;
+    (*totalMoves)++;
 }
 
-void computerMoveParallelV1(Board *board, char symbol) {
+void computerMoveParallelV1(Board *board, char symbol, int *totalMoves, int numThreads, int maxDepth){
 
     int color = (symbol == 'O') ? 1 : -1;
 
@@ -331,7 +335,7 @@ void computerMoveParallelV1(Board *board, char symbol) {
         scoresMoves[i]->moveCol = -1;
     }
 
-    #pragma omp parallel num_threads(NUMTHREADS) default(none) shared(board, symbol, color, boards, globalMoveRow, globalMoveCol, globalBestScore, scoresMoves)
+    #pragma omp parallel num_threads(numThreads) default(none) shared(board, symbol, color, boards, globalMoveRow, globalMoveCol, globalBestScore, scoresMoves, totalMoves, maxDepth)
     {
         int rank = omp_get_thread_num();
         // schedule dynamic may be faster but it won't be deterministic
@@ -340,7 +344,7 @@ void computerMoveParallelV1(Board *board, char symbol) {
             for (int j = 0; j < board->size; j++) {
                 if (boards[rank]->cells[i][j] == ' ') {
                     boards[rank]->cells[i][j] = symbol;
-                    int score = minimax(boards[rank], 0, 0, LOWER_LIMIT, UPPER_LIMIT, MAXDEPTH, color);
+                    int score = minimax(boards[rank], 0, 0, LOWER_LIMIT, UPPER_LIMIT, maxDepth, color);
                     boards[rank]->cells[i][j] = ' ';
                     if (score > scoresMoves[rank]->bestScore) {
                         scoresMoves[rank]->bestScore = score;
@@ -370,13 +374,14 @@ void computerMoveParallelV1(Board *board, char symbol) {
     free(scoresMoves);
 
     board->cells[globalMoveRow][globalMoveCol] = symbol;
+    (*totalMoves)++;
     for (int i = 0; i < NUMTHREADS; i++) {
         freeAllocatedBoard(boards[i]);
     }
 }
 
 
-void computerMoveParallelV2(Board *board, char symbol){
+void computerMoveParallelV2(Board *board, char symbol, int *totalMoves, int numThreads, int maxDepth){
     int color = (symbol == 'O') ? 1 : -1;
 
     Board *boards[NUMTHREADS];
@@ -395,17 +400,17 @@ void computerMoveParallelV2(Board *board, char symbol){
         scoresMoves[i]->moveCol = -1;
     }
 
-    #pragma omp parallel num_threads(NUMTHREADS)
+    #pragma omp parallel num_threads(numThreads)
     {
         #pragma omp single
         for (int i = 0; i < board->size; i++) {
             for (int j = 0; j < board->size; j++) {
-                #pragma omp task shared(boards, scoresMoves, symbol, color) firstprivate(i, j)
+                #pragma omp task shared(boards, scoresMoves, symbol, color, totalMoves) firstprivate(i, j)
                 {
                     int rank = omp_get_thread_num();
                     if (boards[rank]->cells[i][j] == ' ') {
                         boards[rank]->cells[i][j] = symbol;
-                        int score = minimax(boards[rank], 0, 0, LOWER_LIMIT, UPPER_LIMIT, MAXDEPTH, color);
+                        int score = minimax(boards[rank], 0, 0, LOWER_LIMIT, UPPER_LIMIT, maxDepth, color);
                         boards[rank]->cells[i][j] = ' ';
                         if (score > scoresMoves[rank]->bestScore) {
                             scoresMoves[rank]->bestScore = score;
@@ -436,18 +441,19 @@ void computerMoveParallelV2(Board *board, char symbol){
     free(scoresMoves);
 
     board->cells[globalMoveRow][globalMoveCol] = symbol;
+    (*totalMoves)++;
     for (int i = 0; i < NUMTHREADS; i++) {
         freeAllocatedBoard(boards[i]);
     }
 }
 
-void computerMoveParallel(Board *board, char symbol, int parallelVersion){
+void computerMoveParallel(Board *board, char symbol, int parallelVersion, int *totalMoves, int numThreads, int maxDepth){
     switch (parallelVersion){
         case 1:
-            computerMoveParallelV1(board, symbol);
+            computerMoveParallelV1(board, symbol, totalMoves, numThreads, maxDepth);
             break;
         case 2:
-            computerMoveParallelV2(board, symbol);
+            computerMoveParallelV2(board, symbol, totalMoves, numThreads, maxDepth);
             break;
         default:
             fprintf(stderr, "Invalid parallel version specified\n");
@@ -457,9 +463,10 @@ void computerMoveParallel(Board *board, char symbol, int parallelVersion){
     
 }
 
-void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves){
+void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves, int parallelVersion, int numThreads, int maxDepth){
+    struct timespec start, finish;
+    double elapsed;
     while (1) {
-    
         printBoard(board);
         playerMove(board, 'X');
         (*moves)++;
@@ -471,13 +478,19 @@ void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves){
             break;
         }
 
+        clock_gettime(CLOCK_MONOTONIC, &start);
         if (parallel){
-            computerMoveParallel(board, 'O', PARALLELVERSION);
+            computerMoveParallel(board, 'O', parallelVersion, moves, numThreads, maxDepth);
             (*moves)++;
         } else {
-            computerMove(board, 'O');
+            computerMove(board, 'O', moves, maxDepth);
             (*moves)++;
         }
+        clock_gettime(CLOCK_MONOTONIC, &finish);
+        printBoard(board);
+        elapsed = (finish.tv_sec - start.tv_sec);
+        elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+        printf("Computer thought for %.5f seconds..\n", elapsed);
 
         if (checkWin(board, 'O')) {
             *winner = 'O';
@@ -491,16 +504,23 @@ void playHumanVsComputer(Board *board, int parallel, char *winner, int *moves){
 
 
 
-void playComputerVsHuman(Board *board, int parallel, char *winner, int *moves){
+void playComputerVsHuman(Board *board, int parallel, char *winner, int *moves, int parallelVersion, int numThreads, int maxDepth){
+    struct timespec start, finish;
+    double elapsed;
     while (1){
+        clock_gettime(CLOCK_MONOTONIC, &start);
         if (parallel) {
-            computerMoveParallel(board, 'X', PARALLELVERSION);
+            computerMoveParallel(board, 'X', parallelVersion, moves, numThreads, maxDepth);
             (*moves)++;
         } else {
-            computerMove(board, 'X');
+            computerMove(board, 'X', moves, maxDepth);
             (*moves)++;
         }
+        clock_gettime(CLOCK_MONOTONIC, &finish);
         printBoard(board);
+        elapsed = (finish.tv_sec - start.tv_sec);
+        elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+        printf("Computer thought for %.5f seconds..\n", elapsed);
 
         if (checkWin(board, 'X')) {
             *winner = 'X';
@@ -529,11 +549,15 @@ If N*N is odd → the first player (X) makes the last move. The board can become
 
 If N*N is even → the second player (O) makes the last move. The board can become full right after O.
 */
-void playComputerVsComputer(Board *board, int parallel, char *winner){
+void playComputerVsComputer(Board *board, int parallel, char *winner, int parallelVersion, int numThreads, int maxDepth, FILE *outputFile){
+    if (outputFile != NULL){
+        fprintf(outputFile, "%d,%d,%d,%d,%d,", board->size, maxDepth, numThreads, parallel, parallelVersion);
+    }
     struct timespec start, finish;
     double elapsed;
     clock_gettime(CLOCK_MONOTONIC, &start);
     int firstMove = 0;
+    int totalMoves = 0;
 
     while(1){
         if (!firstMove){
@@ -543,9 +567,9 @@ void playComputerVsComputer(Board *board, int parallel, char *winner){
             board->cells[firstMoveRow][firstMoveCol] = 'X';
         } else {
             if (parallel) {
-                computerMoveParallel(board, 'X', PARALLELVERSION);
+                computerMoveParallel(board, 'X', parallelVersion, &totalMoves, numThreads, maxDepth);
             } else {
-                computerMove(board, 'X');
+                computerMove(board, 'X', &totalMoves, maxDepth);
             }
         }
     #ifdef DEBUG
@@ -562,9 +586,9 @@ void playComputerVsComputer(Board *board, int parallel, char *winner){
         }
 
         if (parallel){
-            computerMoveParallel(board, 'O', PARALLELVERSION);
+            computerMoveParallel(board, 'O', parallelVersion, &totalMoves, numThreads, maxDepth);
         } else {
-            computerMove(board, 'O');
+            computerMove(board, 'O', &totalMoves, maxDepth);
         }
     #ifdef DEBUG
         printBoard(board);
@@ -582,5 +606,10 @@ void playComputerVsComputer(Board *board, int parallel, char *winner){
     clock_gettime(CLOCK_MONOTONIC, &finish);
     elapsed = (finish.tv_sec - start.tv_sec);
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
-    printf("Elapsed time: %.5f seconds\n", elapsed);
+    if (outputFile != NULL){
+        fprintf(outputFile, "%.5f,%.5f\n", elapsed, elapsed / totalMoves);
+    } else {
+        printf("Elapsed time: %.5f seconds\n", elapsed);
+        printf("Average time per move: %.5f seconds\n", elapsed / totalMoves);
+    }
 }

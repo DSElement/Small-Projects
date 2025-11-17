@@ -2,7 +2,7 @@
 
 
 int main() {
-
+/*
     Board board;
     printf("Enter the size of the board (N): ");
 
@@ -54,7 +54,7 @@ int main() {
 
     switch (scenario) {
         case 1:
-            playHumanVsComputer(&board, parallelChoice, &winner, &moves);
+            playHumanVsComputer(&board, parallelChoice, &winner, &moves, PARALLELVERSION, NUMTHREADS, MAXDEPTH);
             printBoard(&board);
             if (winner == 'X') {
                 printf("Player wins!\n");
@@ -65,7 +65,7 @@ int main() {
             }
             break;
         case 2:
-            playComputerVsHuman(&board, parallelChoice, &winner, &moves);
+            playComputerVsHuman(&board, parallelChoice, &winner, &moves, PARALLELVERSION, NUMTHREADS, MAXDEPTH);
             printBoard(&board);
             if (winner == 'X') {
                 printf("Computer wins!\n");
@@ -76,7 +76,7 @@ int main() {
             }
             break;
         case 3:
-            playComputerVsComputer(&board, parallelChoice, &winner);
+            playComputerVsComputer(&board, parallelChoice, &winner, PARALLELVERSION, NUMTHREADS, MAXDEPTH, NULL);
 
         #ifndef DEBUG
             printBoard(&board);
@@ -100,6 +100,76 @@ int main() {
         free(board.cells[i]);
     }
     free(board.cells);
+*/
+
+
+    //Performance measurements: For different sizes of the board (N>4) and different depths of the 
+    //minimax search algorithm, for different number of threads (2, 4, 8), with and without parallelism:
+
+    FILE *outputFile = fopen("results.csv", "w");
+    if (!outputFile) {
+        fprintf(stderr, "Error opening file for writing results.\n");
+        return EXIT_FAILURE;
+    }
+    fprintf(outputFile, "BoardSize,MaxDepth,ThreadCount,WithParallelism,ParallelVersion,RunTime,AverageTimePerMove\n");
+
+    Board board;
+
+    int boardSizes[] = {3,4,5,6,7,8};
+    int boardSizesLength = sizeof(boardSizes) / sizeof(boardSizes[0]);
+    int maxDepths[] = {5, 6, 7, 9, 11};
+    int maxDepthsLength = sizeof(maxDepths) / sizeof(maxDepths[0]);
+    int threadCounts[] = {2, 4, 8};
+    int threadCountsLength = sizeof(threadCounts) / sizeof(threadCounts[0]);
+    int parallelVersions[] = {1, 2};
+    int parallelVersionsLength = sizeof(parallelVersions) / sizeof(parallelVersions[0]);
+
+    char winner;
+
+    for (int bi = 0; bi < boardSizesLength; bi++)
+    {
+        board.size = boardSizes[bi];
+
+        board.cells = (char **)malloc(board.size * sizeof(char *));
+        for (int r = 0; r < board.size; r++)
+        {
+            board.cells[r] = (char *)malloc(board.size * sizeof(char));
+        }
+
+        for (int dj = 0; dj < maxDepthsLength; dj++)
+        {
+            int maxDepth = maxDepths[dj];
+
+            if (board.size > 6 && maxDepth > 7 )
+            {
+                continue;
+            }
+
+            initializeBoard(&board);
+            playComputerVsComputer(&board, 0, &winner, 0, 1, maxDepth, outputFile);
+
+            for (int tk = 0; tk < threadCountsLength; tk++)
+            {
+                int numThreads = threadCounts[tk];
+
+                for (int pv = 0; pv < parallelVersionsLength; pv++)
+                {
+                    int parallelVersion = parallelVersions[pv];
+
+                    initializeBoard(&board);
+                    playComputerVsComputer(&board, 1, &winner, parallelVersion, numThreads, maxDepth, outputFile);
+                }
+            }
+        }
+
+        for (int r = 0; r < board.size; r++)
+        {
+            free(board.cells[r]);
+        }
+        free(board.cells);
+    }
+
+    fclose(outputFile);
 
     return 0;
 }
