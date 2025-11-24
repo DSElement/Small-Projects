@@ -6,7 +6,7 @@
 #include <ctype.h>
 #include <omp.h>
 
-//#define DEBUG 1
+#define DEBUG 1
 #define LOWER_LIMIT -1000
 #define UPPER_LIMIT 1000
 #define NUMTHREADS 8
