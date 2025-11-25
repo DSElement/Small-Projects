@@ -22,69 +22,77 @@ ROCK_COLOR = (80, 80, 110)
 TEXT_COLOR = (220, 220, 220)
 
 # Simulation parameters
-MAX_FOOD = 200
+MAX_FOOD = 300
 
-LIVE_PREY_ENERGY_GAIN = 40
+LIVE_PREY_ENERGY_GAIN = 30
 CORPSE_ENERGY_GAIN = LIVE_PREY_ENERGY_GAIN // 2
 
 # Energies
 PREY_MAX_ENERGY = 100
-PREY_INIT_ENERGY = 80
+PREY_INIT_ENERGY = 60
 PRED_MAX_ENERGY = 150
 PRED_INIT_ENERGY = 120
 
-# Speeds
-PREY_SPEED_HIGH = 16.0
-PREY_SPEED_LOW = 18.0
-PRED_SPEED_HIGH = 17.0
-PRED_SPEED_LOW = 19.0
-PREY_SPRINT_SPEED = 19.0
+# Speeds 
+PREY_SPEED_HIGH = 15.0
+PREY_SPEED_LOW = 17.0
+PRED_SPEED_HIGH = 14.0
+PRED_SPEED_LOW = 21.0
+PREY_SPRINT_SPEED = 22.0
 ENERGY_SPEED_THRESHOLD_FRACTION = 0.6  # 60%
 
 # Foraging
-PREY_FORAGE_THRESHOLD_FRACTION = 0.45  # 45%
+PREY_FORAGE_THRESHOLD_FRACTION = 0.65  # 65%
+PREDATOR_VISION_RADIUS = 100.0
+PRED_SATIATED_FRACTION = 0.75
 
 # Sprint
-SPRINT_DURATION = 2.0
+SPRINT_DURATION = 6.0
 SPRINT_COOLDOWN = 20.0
 SPRINT_TRIGGER_DIST = 15.0
-SPRINT_COST_MULTIPLIER = 3.0
+SPRINT_COST_MULTIPLIER = 2.0
 
-# Flocking
+# Flocking (moderate, escapable)
 FLOCK_RADIUS = 50.0
 FLOCK_NEIGHBORS_MIN = 3
 FLOCK_SPEED_BONUS = 1.1
-FLOCK_ALIGNMENT_WEIGHT = 0.2
-FLOCK_COHESION_WEIGHT = 0.1
-FLOCK_SEPARATION_WEIGHT = 0.8
+FLOCK_ALIGNMENT_WEIGHT = 0.4
+FLOCK_COHESION_WEIGHT = 0.25
+FLOCK_SEPARATION_WEIGHT = 0.7
+FLOCK_STRENGTH = 0.6        # cap flock influence
+FLOCK_IGNORE_PROB = 0.1     # chance to ignore flocking this frame
 SEPARATION_RADIUS = 20.0
+WANDER_STRENGTH = 0.1       # random drift to allow leaving flocks
 
 # Obstacles
 ROCK_COUNT = 7
 OBSTACLE_AVOID_RADIUS = 60.0
 OBSTACLE_AVOID_STRENGTH = 1.5
 
+FOOD_ROCK_BUFFER = 50.0  # distance from rock surface
+
 # Reproduction
-REPRO_ENERGY_THRESHOLD_FRACTION_PREY = 0.55
-REPRO_ENERGY_THRESHOLD_FRACTION_PRED = 0.70
+REPRO_ENERGY_THRESHOLD_FRACTION_PREY = 0.60
+REPRO_ENERGY_THRESHOLD_FRACTION_PRED = 0.90
 REPRO_COST_FRACTION = 0.2  # 20% of max energy
-PREY_REPRO_COOLDOWN = 12.0
-PRED_REPRO_COOLDOWN = 25.0
-NEWBORN_COOLDOWN_MULT = 1.5
-MATING_STOP_TIME = 4.0
-MATE_SEARCH_RADIUS = 160.0
+
+PREY_REPRO_COOLDOWN = 18.0 
+PRED_REPRO_COOLDOWN = 40.0
+NEWBORN_COOLDOWN_MULT = 1.0
+MATING_STOP_TIME = 3.0
+MATE_SEARCH_RADIUS = 150.0
 
 # Corpses
 CORPSE_LIFETIME = 5.0
 CORPSE_RADIUS = 4
 
 # Controls limits
-FRUIT_SPAWN_MULT_MIN = 0.2
-FRUIT_SPAWN_MULT_MAX = 10.0
+FRUIT_SPAWN_MULT_MIN = 0.5
+FRUIT_SPAWN_MULT_MAX = 25.0
 ENERGY_RATE_MULT_MIN = 0.25
-ENERGY_RATE_MULT_MAX = 8.0
+ENERGY_RATE_MULT_MAX = 20.0
 TIME_SCALE_MIN = 0.25
-TIME_SCALE_MAX = 8.0
+TIME_SCALE_MAX = 25.0
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -98,15 +106,41 @@ def clamp(value, min_value, max_value):
     return max(min_value, min(max_value, value))
 
 
+def draw_energy_bar(surface, position, fraction, width=20, height=3,
+                    back_color=(40, 40, 40), fill_color=(0, 255, 0)):
+    """Draw a small energy bar above an entity."""
+    fraction = clamp(fraction, 0.0, 1.0)
+    x = int(position.x)
+    y = int(position.y) - 10  # slightly above the entity
+    bar_x = x - width // 2
+    bar_y = y
+    bg_rect = pygame.Rect(bar_x, bar_y, width, height)
+    fg_rect = pygame.Rect(bar_x, bar_y, int(width * fraction), height)
+    pygame.draw.rect(surface, back_color, bg_rect)
+    if fraction > 0:
+        pygame.draw.rect(surface, fill_color, fg_rect)
+
+
 class Fruit:
     def __init__(self, obstacles):
-        # Ensure we don't spawn on top of rocks
+        # Ensure we don't spawn on top of rocks OR too close to them
         while True:
-            self.position = pygame.math.Vector2(
+            pos = pygame.math.Vector2(
                 random.uniform(0, WIDTH),
                 random.uniform(0, HEIGHT)
             )
-            if not any(obs.contains_point(self.position) for obs in obstacles):
+
+            too_close = False
+            for obs in obstacles:
+                dist, _ = obs.distance_and_direction_to_point(pos)
+                # dist is distance from obstacle surface (negative if inside),
+                # so require at least FOOD_ROCK_BUFFER away from the surface
+                if dist < FOOD_ROCK_BUFFER:
+                    too_close = True
+                    break
+
+            if not too_close:
+                self.position = pos
                 break
 
     def update(self):
@@ -114,8 +148,8 @@ class Fruit:
 
 
 class Berry(Fruit):
-    ENERGY = 5
-    SPAWN_CHANCE = 0.02   # base common
+    ENERGY = 10
+    SPAWN_CHANCE = 0.3   # base common
     COLOR = BERRY_COLOR
     RADIUS = 3
 
@@ -126,8 +160,8 @@ class Berry(Fruit):
 
 
 class Jackfruit(Fruit):
-    ENERGY = 20
-    SPAWN_CHANCE = 0.005   # base rare
+    ENERGY = 15
+    SPAWN_CHANCE = 0.1   # base rare
     COLOR = JACKFRUIT_COLOR
     SIZE = 6  # square size
 
@@ -227,9 +261,11 @@ class Prey:
 
         # Reproduction
         self.repro_cooldown_total = PREY_REPRO_COOLDOWN * (NEWBORN_COOLDOWN_MULT if newborn else 1.0)
-        self.repro_cooldown_left = self.repro_cooldown_total  # newborns can't reproduce initially
+        self.repro_cooldown_left = random.uniform(self.repro_cooldown_total * 0.5, self.repro_cooldown_total)
+        """
         if not newborn:
             self.repro_cooldown_left = 0.0
+        """
         self.is_mating = False
         self.mating_partner = None
         self.mating_timer = 0.0
@@ -253,6 +289,8 @@ class Prey:
         return speed
 
     def can_reproduce(self):
+        if self.is_sprinting:
+            return False
         if self.is_mating:
             return False
         if self.repro_cooldown_left > 0.0:
@@ -325,7 +363,9 @@ class Prey:
 
         # 2. If not fleeing & low energy, seek nearest fruit
         forage_threshold = PREY_FORAGE_THRESHOLD_FRACTION * self.max_energy
-        if not fleeing and self.energy < forage_threshold and fruits:
+        hungry = self.energy < forage_threshold
+
+        if not fleeing and hungry and fruits:
             nearest_fruit = min(fruits, key=lambda f: self.position.distance_to(f.position))
             direction = (nearest_fruit.position - self.position)
             if direction.length_squared() > 0:
@@ -341,7 +381,7 @@ class Prey:
                 neighbors.append((other, d))
 
         flock_neighbors_count = len(neighbors)
-        if neighbors:
+        if neighbors and not fleeing and not hungry:  # <<< key change: no flocking when hungry
             alignment = pygame.math.Vector2(0, 0)
             cohesion = pygame.math.Vector2(0, 0)
             separation = pygame.math.Vector2(0, 0)
@@ -366,10 +406,13 @@ class Prey:
                             cohesion * FLOCK_COHESION_WEIGHT +
                             separation * FLOCK_SEPARATION_WEIGHT)
 
-            if flock_vector.length_squared() > 0 and not fleeing:
-                desired += flock_vector
+            # Apply flocking moderately, and only sometimes
+            if flock_vector.length_squared() > 0:
+                if random.random() > FLOCK_IGNORE_PROB:
+                    flock_vector = flock_vector.normalize() * FLOCK_STRENGTH
+                    desired += flock_vector
 
-        # 4. Obstacle avoidance
+        # 4. Obstacle avoidance (steering)
         avoid = pygame.math.Vector2(0, 0)
         for rock in rocks:
             dist, dir_vec = rock.distance_and_direction_to_point(self.position)
@@ -380,6 +423,13 @@ class Prey:
         if avoid.length_squared() > 0:
             desired += avoid
 
+        # 5. Random wander to allow drifting out of flocks (only if not fleeing)
+        if not fleeing and not hungry:  # when hungry, don't random-walk away from food
+            wander = pygame.math.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+            if wander.length_squared() > 0:
+                wander = wander.normalize() * WANDER_STRENGTH
+                desired += wander
+
         if desired.length_squared() > 0:
             desired = desired.normalize()
         self.velocity = desired
@@ -387,6 +437,21 @@ class Prey:
         # Move
         speed = self.current_speed(flock_neighbors_count)
         self.position += self.velocity * speed * dt
+
+        # Rock collision & bounce
+        for rock in rocks:
+            if rock.contains_point(self.position):
+                dist, normal = rock.distance_and_direction_to_point(self.position)
+                if normal.length_squared() > 0:
+                    # Push out a bit
+                    push = 1.0
+                    if dist < 0:
+                        push = -dist + 1.0
+                    self.position += normal * push
+                    # Reflect velocity
+                    v = self.velocity
+                    dot = v.x * normal.x + v.y * normal.y
+                    self.velocity = v - 2 * dot * normal
 
         # Bounce off edges (simple clamp)
         if self.position.x < 0 or self.position.x > WIDTH:
@@ -402,12 +467,16 @@ class Prey:
             cost *= SPRINT_COST_MULTIPLIER
         self.energy = max(0.0, self.energy - cost * energy_rate_multiplier * dt)
 
+
     def eat(self, fruit):
         self.energy = min(self.max_energy, self.energy + fruit.ENERGY)
 
     def draw(self, surface):
         pygame.draw.circle(surface, PREY_COLOR,
                            (int(self.position.x), int(self.position.y)), 4)
+        draw_energy_bar(surface, self.position,
+                        self.energy / self.max_energy if self.max_energy > 0 else 0.0,
+                        fill_color=(0, 255, 0))
 
 
 class Predator:
@@ -424,9 +493,12 @@ class Predator:
 
         # Reproduction
         self.repro_cooldown_total = PRED_REPRO_COOLDOWN * (NEWBORN_COOLDOWN_MULT if newborn else 1.0)
-        self.repro_cooldown_left = self.repro_cooldown_total
+        self.repro_cooldown_left = random.uniform(self.repro_cooldown_total * 0.5, self.repro_cooldown_total)
+        
+        """
         if not newborn:
             self.repro_cooldown_left = 0.0
+        """
         self.is_mating = False
         self.mating_partner = None
         self.mating_timer = 0.0
@@ -463,6 +535,9 @@ class Predator:
         self.energy -= REPRO_COST_FRACTION * self.max_energy
         self.energy = max(self.energy, 0.0)
 
+    def is_satiated(self):
+        return self.energy > PRED_SATIATED_FRACTION * self.max_energy
+
     def update(self, prey_list, rocks, dt, energy_rate_multiplier):
         if self.energy <= 0:
             return
@@ -476,15 +551,23 @@ class Predator:
             return
 
         # Simple hunting behavior: move towards the nearest prey
+        visible_prey = [
+            prey for prey in prey_list
+            if self.position.distance_to(prey.position) < PREDATOR_VISION_RADIUS
+        ]
+
         desired = pygame.math.Vector2(self.velocity)
 
-        if prey_list:
-            nearest_prey = min(prey_list, key=lambda prey: self.position.distance_to(prey.position))
+        if not self.is_satiated() and visible_prey:
+            nearest_prey = min(visible_prey, key=lambda prey: self.position.distance_to(prey.position))
             direction = (nearest_prey.position - self.position)
             if direction.length_squared() > 0:
                 desired = direction.normalize()
+        else:
+            # satiated or no prey in sight → just keep going / wander
+            desired = pygame.math.Vector2(self.velocity)
 
-        # Obstacle avoidance
+        # Obstacle avoidance (steering)
         avoid = pygame.math.Vector2(0, 0)
         for rock in rocks:
             dist, dir_vec = rock.distance_and_direction_to_point(self.position)
@@ -501,6 +584,19 @@ class Predator:
 
         speed = self.current_speed()
         self.position += self.velocity * speed * dt
+
+        # Rock collision & bounce
+        for rock in rocks:
+            if rock.contains_point(self.position):
+                dist, normal = rock.distance_and_direction_to_point(self.position)
+                if normal.length_squared() > 0:
+                    push = 1.0
+                    if dist < 0:
+                        push = -dist + 1.0
+                    self.position += normal * push
+                    v = self.velocity
+                    dot = v.x * normal.x + v.y * normal.y
+                    self.velocity = v - 2 * dot * normal
 
         # Bounce off the edges
         if self.position.x < 0 or self.position.x > WIDTH:
@@ -537,7 +633,10 @@ class Predator:
         rotated_point_list = [self.position + p.rotate(-angle) for p in point_list]
 
         # Draw the predator as a triangle
-        pygame.draw.polygon(screen, PREDATOR_COLOR, rotated_point_list)
+        pygame.draw.polygon(surface, PREDATOR_COLOR, rotated_point_list)
+        draw_energy_bar(surface, self.position,
+                        self.energy / self.max_energy if self.max_energy > 0 else 0.0,
+                        fill_color=(255, 80, 80))
 
 
 def create_rocks():
@@ -562,7 +661,7 @@ def spawn_initial_populations():
     # For simplicity, we don't avoid rocks when spawning agents; they'll steer away
     for _ in range(50):
         prey_list.append(Prey(newborn=False))
-    for _ in range(3):
+    for _ in range(5):
         predator_list.append(Predator(newborn=False))
     return prey_list, predator_list
 
@@ -683,9 +782,12 @@ def adjust_position_off_rocks(pos, rocks):
 def handle_reproduction(agent_list, dt, rocks):
     births = 0
     # Update mating timers
+    """
     for agent in agent_list:
         if agent.is_mating:
             agent.mating_timer -= dt
+    """
+    
     # Finish matings and spawn offspring (only from one of the pair)
     new_agents = []
     for agent in agent_list:
@@ -725,9 +827,9 @@ def main():
     corpse_list = []
 
     # Controls
-    fruit_spawn_mult = 1.0
-    energy_rate_mult = 1.0
-    time_scale = 1.5
+    fruit_spawn_mult = 10.0
+    energy_rate_mult = 3.0
+    time_scale = 16.0  # faster default simulation
 
     running = True
     sim_time = 0.0
@@ -777,9 +879,9 @@ def main():
 
         # Spawn fruits
         if len(fruit_list) < MAX_FOOD:
-            if random.random() < Berry.SPAWN_CHANCE * fruit_spawn_mult:
+            if random.random() < Berry.SPAWN_CHANCE * fruit_spawn_mult * dt:
                 fruit_list.append(Berry(rocks))
-            if random.random() < Jackfruit.SPAWN_CHANCE * fruit_spawn_mult:
+            if random.random() < Jackfruit.SPAWN_CHANCE * fruit_spawn_mult * dt:
                 fruit_list.append(Jackfruit(rocks))
 
         # Update corpses
@@ -815,6 +917,7 @@ def main():
                 if predator.position.distance_to(prey.position) < 6:
                     prey_list.remove(prey)
                     predator.eat_prey()
+                    break  # one prey per predator per update
 
         # Predator eats corpses
         for predator in predator_list:
