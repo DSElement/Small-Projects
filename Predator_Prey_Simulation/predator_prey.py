@@ -44,7 +44,7 @@ ENERGY_SPEED_THRESHOLD_FRACTION = 0.6  # 60%
 # Foraging
 PREY_FORAGE_THRESHOLD_FRACTION = 0.65  # 65%
 PREDATOR_VISION_RADIUS = 100.0
-PRED_SATIATED_FRACTION = 0.75
+PRED_SATIATED_FRACTION = 0.8
 
 # Sprint
 SPRINT_DURATION = 6.0
@@ -73,7 +73,7 @@ FOOD_ROCK_BUFFER = 50.0  # distance from rock surface
 
 # Reproduction
 REPRO_ENERGY_THRESHOLD_FRACTION_PREY = 0.60
-REPRO_ENERGY_THRESHOLD_FRACTION_PRED = 0.90
+REPRO_ENERGY_THRESHOLD_FRACTION_PRED = 0.80
 REPRO_COST_FRACTION = 0.2  # 20% of max energy
 
 PREY_REPRO_COOLDOWN = 18.0 
@@ -309,7 +309,7 @@ class Prey:
         self.mating_partner = None
         self.mating_timer = 0.0
         self.repro_cooldown_total = PREY_REPRO_COOLDOWN
-        self.repro_cooldown_left = self.repro_cooldown_total
+        self.repro_cooldown_left = random.uniform(self.repro_cooldown_total * 0.5, self.repro_cooldown_total)
         # Apply reproduction energy cost
         self.energy -= REPRO_COST_FRACTION * self.max_energy
         self.energy = max(self.energy, 0.0)
@@ -530,7 +530,7 @@ class Predator:
         self.mating_partner = None
         self.mating_timer = 0.0
         self.repro_cooldown_total = PRED_REPRO_COOLDOWN
-        self.repro_cooldown_left = self.repro_cooldown_total
+        self.repro_cooldown_left = random.uniform(self.repro_cooldown_total * 0.5, self.repro_cooldown_total)
         # Apply reproduction energy cost
         self.energy -= REPRO_COST_FRACTION * self.max_energy
         self.energy = max(self.energy, 0.0)
@@ -781,12 +781,6 @@ def adjust_position_off_rocks(pos, rocks):
 
 def handle_reproduction(agent_list, dt, rocks):
     births = 0
-    # Update mating timers
-    """
-    for agent in agent_list:
-        if agent.is_mating:
-            agent.mating_timer -= dt
-    """
     
     # Finish matings and spawn offspring (only from one of the pair)
     new_agents = []
