@@ -1,9 +1,9 @@
 package city;
 
 public enum CongestionLevel {
-    VeryLow,
-    Low,
-    Moderate,
-    High,
-    VeryHigh
+    VERY_LOW,
+    LOW,
+    MODERATE,
+    HIGH,
+    VERY_HIGH
 }

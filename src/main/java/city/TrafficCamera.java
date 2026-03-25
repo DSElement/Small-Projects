@@ -4,8 +4,8 @@ import org.greenrobot.eventbus.EventBus;
 
 public class TrafficCamera {
     private final EventBus eventBus;
-    private CameraType cameraType = city.CameraType.TRAFFIC_CAMERA;
-    private String streetName;
+    private final CameraType cameraType = CameraType.TRAFFIC_CAMERA;
+    private final String streetName;
     private CongestionLevel congestionLevel;
 
     public TrafficCamera(EventBus eventBus, String streetName, CongestionLevel congestionLevel) {
@@ -15,6 +15,9 @@ public class TrafficCamera {
     }
 
     public void updateCongestionLevel(CongestionLevel newLevel) {
+        if (newLevel == null) {
+            throw new IllegalArgumentException("Congestion level must not be null");
+        }
         if (newLevel == congestionLevel) {
             return; // No change in congestion level
         }

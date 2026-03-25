@@ -4,8 +4,8 @@ import org.greenrobot.eventbus.EventBus;
 
 public class SurveillanceCamera {
     private final EventBus eventBus;
-    private CameraType cameraType = city.CameraType.SURVEILLANCE_CAMERA;
-    private String location;
+    private final CameraType cameraType = CameraType.SURVEILLANCE_CAMERA;
+    private final String location;
 
     public SurveillanceCamera(EventBus eventBus, String location) {
         this.eventBus = eventBus;
@@ -13,6 +13,9 @@ public class SurveillanceCamera {
     }
 
     public void detectSuspiciousActivity(String activityDescription) {
+        if (activityDescription == null || activityDescription.isBlank()) {
+            throw new IllegalArgumentException("Activity description must not be blank");
+        }
         PublicDisorderEvent event = new PublicDisorderEvent(cameraType,
                                                                 location,
                                                                 activityDescription);
