@@ -1,13 +1,19 @@
 package city;
 
 import org.greenrobot.eventbus.EventBus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Program{
+    private static final Logger logger = LoggerFactory.getLogger(Program.class);
+
     public static void main(String[] args){
         EventBus eventBus = EventBus.getDefault();
         Random random = new Random();
@@ -27,7 +33,17 @@ public class Program{
         TrafficCamera trafficCamera3 = new TrafficCamera(eventBus, "Third Boulevard", CongestionLevel.HIGH);
         TrafficCamera trafficCamera4 = new TrafficCamera(eventBus, "Fourth Road", CongestionLevel.VERY_HIGH);
 
-        ExecutorService executor = Executors.newFixedThreadPool(11);
+        ThreadFactory namedThreadFactory = new ThreadFactory() {
+            private final AtomicInteger count = new AtomicInteger(0);
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r);
+                t.setName("camera-" + count.incrementAndGet());
+                t.setDaemon(false);
+                return t;
+            }
+        };
+        ExecutorService executor = Executors.newFixedThreadPool(11, namedThreadFactory);
 
         executor.submit(() -> {
             int[] observedSpeeds = {70, 52, 48, 90, 61};
@@ -153,10 +169,12 @@ public class Program{
 
         executor.shutdown();
         try {
-            if (!executor.awaitTermination(11, TimeUnit.SECONDS)) {
+            if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+                logger.warn("Executor did not terminate within timeout, forcing shutdown");
                 executor.shutdownNow();
             }
         } catch (InterruptedException ex) {
+            logger.warn("Executor shutdown interrupted");
             executor.shutdownNow();
             Thread.currentThread().interrupt();
         }
@@ -164,6 +182,7 @@ public class Program{
         dashboard.shutdownLiveReporter();
 
         eventBus.unregister(dashboard);
+        logger.info("Surveillance system shutdown complete");
     }
 }
 

@@ -1,6 +1,8 @@
 package city;
 
 import org.greenrobot.eventbus.Subscribe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class CityInformationDashboard {
+    private static final Logger logger = LoggerFactory.getLogger(CityInformationDashboard.class);
     private static final int LIVE_REPORT_FREQUENCY = 3;
     private static final int LIVE_DANGEROUS_STREETS_LIMIT = 3;
 
@@ -42,29 +45,38 @@ public class CityInformationDashboard {
 
     @Subscribe
     public void onSpeedViolation(SpeedViolationEvent event) {
+        if (event == null) {
+            logger.warn("Received null SpeedViolationEvent");
+            return;
+        }
         numberOfSpeedViolations.incrementAndGet();
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
         registerSeriousIssueAndMaybeReport(event.getStreetName());
-        System.out.println("Speed violation detected on " + event.getStreetName() + 
-                            " at speed " + event.getRecordedSpeed() + 
-                            " km/h. License plate: " + event.getPlateNumber());
+        logger.info("Speed violation detected on {} at speed {} km/h. License plate: {}",
+                   event.getStreetName(), event.getRecordedSpeed(), event.getPlateNumber());
     }
 
     @Subscribe
     public void onPublicDisorder(PublicDisorderEvent event) {
+        if (event == null) {
+            logger.warn("Received null PublicDisorderEvent");
+            return;
+        }
         numberOfPublicDisorderIncidents.incrementAndGet();
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
         registerSeriousIssueAndMaybeReport(event.getStreetName());
-        System.out.println("Public disorder detected at " + event.getStreetName() + 
-                            ": " + event.getDisorderDescription());
+        logger.info("Public disorder detected at {}: {}", event.getStreetName(), event.getDisorderDescription());
     }
 
     @Subscribe
     public void onTrafficCongestion(TrafficCongestionEvent event) {
+        if (event == null) {
+            logger.warn("Received null TrafficCongestionEvent");
+            return;
+        }
         congestionLevelsByStreet.put(event.getStreetName(), event.getCongestionLevel());
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
-        System.out.println("Traffic congestion updated on " + event.getStreetName() + 
-                            ": " + event.getCongestionLevel());
+        logger.info("Traffic congestion updated on {}: {}", event.getStreetName(), event.getCongestionLevel());
     }
 
     public int getNumberOfSpeedViolations() {
@@ -124,7 +136,7 @@ public class CityInformationDashboard {
                 if (dangerousStreets.isEmpty()) {
                     return;
                 }
-                System.out.println("[Live dangerous streets | status at report #" + reportNumber + "] " + dangerousStreets);
+                logger.info("[Live dangerous streets | status at report #{}] {}", reportNumber, dangerousStreets);
             });
         }
     }
@@ -134,17 +146,19 @@ public class CityInformationDashboard {
             return List.of();
         }
 
-        List<Map.Entry<String, AtomicInteger>> sorted = new ArrayList<>(seriousIssuesByStreet.entrySet());
-        sorted.sort(Comparator.comparingInt((Map.Entry<String, AtomicInteger> entry) -> entry.getValue().get())
-                              .reversed());
+        synchronized (liveReportTriggerLock) {
+            List<Map.Entry<String, AtomicInteger>> sorted = new ArrayList<>(seriousIssuesByStreet.entrySet());
+            sorted.sort(Comparator.comparingInt((Map.Entry<String, AtomicInteger> entry) -> entry.getValue().get())
+                                  .reversed());
 
-        List<String> result = new ArrayList<>();
-        int count = Math.min(limit, sorted.size());
-        for (int i = 0; i < count; i++) {
-            result.add(sorted.get(i).getKey());
+            List<String> result = new ArrayList<>();
+            int count = Math.min(limit, sorted.size());
+            for (int i = 0; i < count; i++) {
+                result.add(sorted.get(i).getKey());
+            }
+
+            Collections.shuffle(result, random);
+            return result;
         }
-
-        Collections.shuffle(result, random);
-        return result;
     }
 }
