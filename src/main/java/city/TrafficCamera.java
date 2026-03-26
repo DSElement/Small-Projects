@@ -4,7 +4,6 @@ import org.greenrobot.eventbus.EventBus;
 
 public class TrafficCamera {
     private final EventBus eventBus;
-    private final CameraType cameraType = CameraType.TRAFFIC_CAMERA;
     private final String streetName;
     private CongestionLevel congestionLevel;
 
@@ -23,7 +22,7 @@ public class TrafficCamera {
         }
 
         congestionLevel = newLevel;
-        TrafficCongestionEvent event = new TrafficCongestionEvent(cameraType, streetName, congestionLevel);
+        TrafficCongestionEvent event = new TrafficCongestionEvent(streetName, congestionLevel);
         eventBus.post(event);
     }
 }

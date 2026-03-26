@@ -4,8 +4,8 @@ public class SpeedViolationEvent extends CityEvent {
     private final double recordedSpeed;
     private final String plateNumber;
 
-    public SpeedViolationEvent(CameraType cameraType, String streetName, double recordedSpeed, String plateNumber) {
-        super(cameraType, streetName);
+    public SpeedViolationEvent(String streetName, double recordedSpeed, String plateNumber) {
+        super(streetName);
         this.recordedSpeed = recordedSpeed;
         this.plateNumber = plateNumber;
     }

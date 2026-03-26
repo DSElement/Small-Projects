@@ -2,6 +2,7 @@ package city;
 
 import org.greenrobot.eventbus.EventBus;
 
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -9,22 +10,30 @@ import java.util.concurrent.TimeUnit;
 public class Program{
     public static void main(String[] args){
         EventBus eventBus = EventBus.getDefault();
+        Random random = new Random();
 
         CityInformationDashboard dashboard = new CityInformationDashboard();
         eventBus.register(dashboard);
 
         SpeedCamera speedCamera1 = new SpeedCamera(eventBus, "Main Street", 50);
         SpeedCamera speedCamera2 = new SpeedCamera(eventBus, "Second Avenue", 30);
+        SpeedCamera speedCamera3 = new SpeedCamera(eventBus, "Third Boulevard", 40);
+        SpeedCamera speedCamera4 = new SpeedCamera(eventBus, "Fourth Road", 60);
         SurveillanceCamera surveillanceCamera1 = new SurveillanceCamera(eventBus, "Central Park");
+        SurveillanceCamera surveillanceCamera2 = new SurveillanceCamera(eventBus, "Downtown Square");
+        SurveillanceCamera surveillanceCamera3 = new SurveillanceCamera(eventBus, "City Hall");
         TrafficCamera trafficCamera1 = new TrafficCamera(eventBus, "Main Street", CongestionLevel.LOW);
+        TrafficCamera trafficCamera2 = new TrafficCamera(eventBus, "Second Avenue", CongestionLevel.MODERATE);
+        TrafficCamera trafficCamera3 = new TrafficCamera(eventBus, "Third Boulevard", CongestionLevel.HIGH);
+        TrafficCamera trafficCamera4 = new TrafficCamera(eventBus, "Fourth Road", CongestionLevel.VERY_HIGH);
 
-        ExecutorService executor = Executors.newFixedThreadPool(4);
+        ExecutorService executor = Executors.newFixedThreadPool(11);
 
         executor.submit(() -> {
             int[] observedSpeeds = {70, 52, 48, 90, 61};
             String[] plates = {"ABC-123", "AA-111", "BB-222", "CC-333", "DD-444"};
             for (int i = 0; i < observedSpeeds.length; i++) {
-                speedCamera1.checkForSpeeding(observedSpeeds[i], plates[i]);
+                speedCamera1.checkForSpeeding(observedSpeeds[i] + random.nextInt(15), plates[i]);
             }
         });
 
@@ -32,7 +41,23 @@ public class Program{
             int[] observedSpeeds = {40, 31, 29, 55, 36};
             String[] plates = {"XYZ-789", "EE-555", "FF-666", "GG-777", "HH-888"};
             for (int i = 0; i < observedSpeeds.length; i++) {
-                speedCamera2.checkForSpeeding(observedSpeeds[i], plates[i]);
+                speedCamera2.checkForSpeeding(observedSpeeds[i] + random.nextInt(15), plates[i]);
+            }
+        });
+
+        executor.submit(() -> {
+            int[] observedSpeeds = {50, 42, 38, 65, 46};
+            String[] plates = {"IJK-901", "II-222", "JJ-333", "KK-444", "LL-555"};
+            for (int i = 0; i < observedSpeeds.length; i++) {
+                speedCamera3.checkForSpeeding(observedSpeeds[i] + random.nextInt(15), plates[i]);
+            }
+        });
+
+        executor.submit(() -> {
+            int[] observedSpeeds = {60, 51, 49, 75, 56};
+            String[] plates = {"MNO-678", "MM-777", "NN-888", "OO-999", "PP-000"};
+            for (int i = 0; i < observedSpeeds.length; i++) {
+                speedCamera4.checkForSpeeding(observedSpeeds[i] + random.nextInt(15), plates[i]);
             }
         });
 
@@ -40,10 +65,37 @@ public class Program{
             String[] incidents = {
                 "Group of people loitering",
                 "Garbage thrown near bench",
-                "Vandalism attempt"
+                "Vandalism attempt",
+                "Suspicious person detected"
             };
-            for (String incident : incidents) {
-                surveillanceCamera1.detectSuspiciousActivity(incident);
+            int eventCount = 2 + random.nextInt(3);
+            for (int i = 0; i < eventCount; i++) {
+                surveillanceCamera1.detectSuspiciousActivity(incidents[random.nextInt(incidents.length)]);
+            }
+        });
+
+        executor.submit(() -> {
+            String[] incidents = {
+                "Public intoxication",
+                "Suspicious package left unattended",
+                "Altercation detected",
+                "Theft in progress"
+            };
+            int eventCount = 1 + random.nextInt(3);
+            for (int i = 0; i < eventCount; i++) {
+                surveillanceCamera2.detectSuspiciousActivity(incidents[random.nextInt(incidents.length)]);
+            }
+        });
+
+        executor.submit(() -> {
+            String[] incidents = {
+                "Vandalism attempt",
+                "Suspicious activity",
+                "Unauthorized entry"
+            };
+            int eventCount = 1 + random.nextInt(2);
+            for (int i = 0; i < eventCount; i++) {
+                surveillanceCamera3.detectSuspiciousActivity(incidents[random.nextInt(incidents.length)]);
             }
         });
 
@@ -60,9 +112,48 @@ public class Program{
             }
         });
 
+        executor.submit(() -> {
+            CongestionLevel[] levels = {
+                CongestionLevel.LOW,
+                CongestionLevel.MODERATE,
+                CongestionLevel.HIGH,
+                CongestionLevel.VERY_HIGH,
+                CongestionLevel.HIGH
+            };
+            for (CongestionLevel level : levels) {
+                trafficCamera2.updateCongestionLevel(level);
+            }
+        });
+
+        executor.submit(() -> {
+            CongestionLevel[] levels = {
+                CongestionLevel.MODERATE,
+                CongestionLevel.HIGH,
+                CongestionLevel.VERY_HIGH,
+                CongestionLevel.HIGH,
+                CongestionLevel.MODERATE
+            };
+            for (CongestionLevel level : levels) {
+                trafficCamera3.updateCongestionLevel(level);
+            }
+        });
+
+        executor.submit(() -> {
+            CongestionLevel[] levels = {
+                CongestionLevel.LOW,
+                CongestionLevel.MODERATE,
+                CongestionLevel.HIGH,
+                CongestionLevel.VERY_HIGH,
+                CongestionLevel.HIGH
+            };
+            for (CongestionLevel level : levels) {
+                trafficCamera4.updateCongestionLevel(level);
+            }
+        });
+
         executor.shutdown();
         try {
-            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+            if (!executor.awaitTermination(11, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
             }
         } catch (InterruptedException ex) {
@@ -70,12 +161,7 @@ public class Program{
             Thread.currentThread().interrupt();
         }
 
-        System.out.println();
-        System.out.println("--- Dashboard Summary ---");
-        System.out.println("Speed fines: " + dashboard.getNumberOfSpeedViolations());
-        System.out.println("Public disorder fines: " + dashboard.getNumberOfPublicDisorderIncidents());
-        System.out.println("Current congestion map: " + dashboard.getCongestionLevelsByStreet());
-        System.out.println("Most dangerous neighborhoods: " + dashboard.getMostDangerousNeighborhoods(3));
+        dashboard.shutdownLiveReporter();
 
         eventBus.unregister(dashboard);
     }

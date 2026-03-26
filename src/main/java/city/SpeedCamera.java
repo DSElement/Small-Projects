@@ -4,7 +4,6 @@ import org.greenrobot.eventbus.EventBus;
 
 public class SpeedCamera {
     private final EventBus eventBus;
-    private final CameraType cameraType = CameraType.SPEED_CAMERA;
     private final String streetName;
     private final int speedLimit;
 
@@ -25,8 +24,7 @@ public class SpeedCamera {
             return;
         }
 
-        SpeedViolationEvent event = new SpeedViolationEvent(cameraType, 
-                                                            streetName,
+        SpeedViolationEvent event = new SpeedViolationEvent(streetName,
                                                             vehicleSpeed,
                                                             licensePlate);
         eventBus.post(event);

@@ -3,29 +3,48 @@ package city;
 import org.greenrobot.eventbus.Subscribe;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class CityInformationDashboard {
+    private static final int LIVE_REPORT_FREQUENCY = 3;
+    private static final int LIVE_DANGEROUS_STREETS_LIMIT = 3;
+
     private final AtomicInteger numberOfSpeedViolations;
     private final AtomicInteger numberOfPublicDisorderIncidents;
+    private final AtomicInteger seriousReportsCounter;
     private final Map<String, CongestionLevel> congestionLevelsByStreet;
     private final Map<String, AtomicInteger> issuesByStreet;
+    private final Map<String, AtomicInteger> seriousIssuesByStreet;
+    private final ExecutorService liveReporter;
+    private final Object liveReportTriggerLock;
+    private final Random random;
 
     public CityInformationDashboard() {
         this.numberOfSpeedViolations = new AtomicInteger(0);
         this.numberOfPublicDisorderIncidents = new AtomicInteger(0);
+        this.seriousReportsCounter = new AtomicInteger(0);
         this.congestionLevelsByStreet = new ConcurrentHashMap<>();
         this.issuesByStreet = new ConcurrentHashMap<>();
+        this.seriousIssuesByStreet = new ConcurrentHashMap<>();
+        this.liveReporter = Executors.newSingleThreadExecutor();
+        this.liveReportTriggerLock = new Object();
+        this.random = new Random();
     }
 
     @Subscribe
     public void onSpeedViolation(SpeedViolationEvent event) {
         numberOfSpeedViolations.incrementAndGet();
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
+        registerSeriousIssueAndMaybeReport(event.getStreetName());
         System.out.println("Speed violation detected on " + event.getStreetName() + 
                             " at speed " + event.getRecordedSpeed() + 
                             " km/h. License plate: " + event.getPlateNumber());
@@ -35,6 +54,7 @@ public class CityInformationDashboard {
     public void onPublicDisorder(PublicDisorderEvent event) {
         numberOfPublicDisorderIncidents.incrementAndGet();
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
+        registerSeriousIssueAndMaybeReport(event.getStreetName());
         System.out.println("Public disorder detected at " + event.getStreetName() + 
                             ": " + event.getDisorderDescription());
     }
@@ -73,6 +93,58 @@ public class CityInformationDashboard {
         for (int i = 0; i < count; i++) {
             result.add(sorted.get(i).getKey());
         }
+        return result;
+    }
+
+    public void shutdownLiveReporter() {
+        liveReporter.shutdown();
+        try {
+            if (!liveReporter.awaitTermination(5, TimeUnit.SECONDS)) {
+                liveReporter.shutdownNow();
+            }
+        } catch (InterruptedException ex) {
+            liveReporter.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void registerSeriousIssueAndMaybeReport(String streetName) {
+        synchronized (liveReportTriggerLock) {
+            seriousIssuesByStreet
+                .computeIfAbsent(streetName, ignored -> new AtomicInteger(0))
+                .incrementAndGet();
+
+            int reportNumber = seriousReportsCounter.incrementAndGet();
+            if (reportNumber % LIVE_REPORT_FREQUENCY != 0) {
+                return;
+            }
+
+            liveReporter.submit(() -> {
+                List<String> dangerousStreets = getMostDangerousStreetsBySeriousReports(LIVE_DANGEROUS_STREETS_LIMIT);
+                if (dangerousStreets.isEmpty()) {
+                    return;
+                }
+                System.out.println("[Live dangerous streets | status at report #" + reportNumber + "] " + dangerousStreets);
+            });
+        }
+    }
+
+    private List<String> getMostDangerousStreetsBySeriousReports(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+
+        List<Map.Entry<String, AtomicInteger>> sorted = new ArrayList<>(seriousIssuesByStreet.entrySet());
+        sorted.sort(Comparator.comparingInt((Map.Entry<String, AtomicInteger> entry) -> entry.getValue().get())
+                              .reversed());
+
+        List<String> result = new ArrayList<>();
+        int count = Math.min(limit, sorted.size());
+        for (int i = 0; i < count; i++) {
+            result.add(sorted.get(i).getKey());
+        }
+
+        Collections.shuffle(result, random);
         return result;
     }
 }
