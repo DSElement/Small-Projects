@@ -1,0 +1,23 @@
+package city;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class AppleMaps extends NavigationApp {
+    private static final Logger logger = LoggerFactory.getLogger(AppleMaps.class);
+
+    public AppleMaps() {
+        super("Apple Maps");
+    }
+
+    public AppleMaps(boolean debugMode) {
+        super("Apple Maps", debugMode);
+    }
+
+    @Override
+    public void update(TrafficCongestionEvent event) {
+        if (debugMode) {
+            logger.info("Apple Maps updated: {} - Congestion level: {}", event.getStreetName(), event.getCongestionLevel());
+        }
+    }
+}

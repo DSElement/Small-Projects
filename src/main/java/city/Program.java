@@ -18,8 +18,19 @@ public class Program{
         EventBus eventBus = EventBus.getDefault();
         Random random = new Random();
 
-        CityInformationDashboard dashboard = new CityInformationDashboard();
+        TrafficPolice trafficPolice = new TrafficPolice();
+        LocalPolice localPolice = new LocalPolice();
+        CityInformationDashboard dashboard = new CityInformationDashboard(trafficPolice, localPolice);
+        eventBus.register(trafficPolice);
+        eventBus.register(localPolice);
         eventBus.register(dashboard);
+
+        Waze waze = new Waze();
+        GoogleMaps googleMaps = new GoogleMaps();
+        AppleMaps appleMaps = new AppleMaps();
+        eventBus.register(waze);
+        eventBus.register(googleMaps);
+        eventBus.register(appleMaps);
 
         SpeedCamera speedCamera1 = new SpeedCamera(eventBus, "Main Street", 50);
         SpeedCamera speedCamera2 = new SpeedCamera(eventBus, "Second Avenue", 30);
@@ -181,7 +192,13 @@ public class Program{
 
         dashboard.shutdownLiveReporter();
 
+        eventBus.unregister(trafficPolice);
+        eventBus.unregister(localPolice);
         eventBus.unregister(dashboard);
+        eventBus.unregister(waze);
+        eventBus.unregister(googleMaps);
+        eventBus.unregister(appleMaps);
+
         logger.info("Surveillance system shutdown complete");
     }
 }

@@ -21,8 +21,8 @@ public class CityInformationDashboard {
     private static final int LIVE_REPORT_FREQUENCY = 3;
     private static final int LIVE_DANGEROUS_STREETS_LIMIT = 3;
 
-    private final AtomicInteger numberOfSpeedViolations;
-    private final AtomicInteger numberOfPublicDisorderIncidents;
+    private final TrafficPolice trafficPolice;
+    private final LocalPolice localPolice;
     private final AtomicInteger seriousReportsCounter;
     private final Map<String, CongestionLevel> congestionLevelsByStreet;
     private final Map<String, AtomicInteger> issuesByStreet;
@@ -30,10 +30,16 @@ public class CityInformationDashboard {
     private final ExecutorService liveReporter;
     private final Object liveReportTriggerLock;
     private final Random random;
+    private final boolean debugMode;
 
-    public CityInformationDashboard() {
-        this.numberOfSpeedViolations = new AtomicInteger(0);
-        this.numberOfPublicDisorderIncidents = new AtomicInteger(0);
+    public CityInformationDashboard(TrafficPolice trafficPolice, LocalPolice localPolice) {
+        this(trafficPolice, localPolice, false);
+    }
+
+    public CityInformationDashboard(TrafficPolice trafficPolice, LocalPolice localPolice, boolean debugMode) {
+        this.trafficPolice = trafficPolice;
+        this.localPolice = localPolice;
+        this.debugMode = debugMode;
         this.seriousReportsCounter = new AtomicInteger(0);
         this.congestionLevelsByStreet = new ConcurrentHashMap<>();
         this.issuesByStreet = new ConcurrentHashMap<>();
@@ -49,11 +55,12 @@ public class CityInformationDashboard {
             logger.warn("Received null SpeedViolationEvent");
             return;
         }
-        numberOfSpeedViolations.incrementAndGet();
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
         registerSeriousIssueAndMaybeReport(event.getStreetName());
-        logger.info("Speed violation detected on {} at speed {} km/h. License plate: {}",
-                   event.getStreetName(), event.getRecordedSpeed(), event.getPlateNumber());
+        if (debugMode) {
+            logger.info("Speed violation detected on {} at speed {} km/h. License plate: {}",
+                       event.getStreetName(), event.getRecordedSpeed(), event.getPlateNumber());
+        }
     }
 
     @Subscribe
@@ -62,10 +69,11 @@ public class CityInformationDashboard {
             logger.warn("Received null PublicDisorderEvent");
             return;
         }
-        numberOfPublicDisorderIncidents.incrementAndGet();
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
         registerSeriousIssueAndMaybeReport(event.getStreetName());
-        logger.info("Public disorder detected at {}: {}", event.getStreetName(), event.getDisorderDescription());
+        if (debugMode) {
+            logger.info("Public disorder detected at {}: {}", event.getStreetName(), event.getDisorderDescription());
+        }
     }
 
     @Subscribe
@@ -76,15 +84,17 @@ public class CityInformationDashboard {
         }
         congestionLevelsByStreet.put(event.getStreetName(), event.getCongestionLevel());
         issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
-        logger.info("Traffic congestion updated on {}: {}", event.getStreetName(), event.getCongestionLevel());
+        if (debugMode) {
+            logger.info("Traffic congestion updated on {}: {}", event.getStreetName(), event.getCongestionLevel());
+        }
     }
 
-    public int getNumberOfSpeedViolations() {
-        return numberOfSpeedViolations.get();
+    public int getNumberOfSpeedingFines() {
+        return trafficPolice.getSpeedingViolationCount();
     }
 
-    public int getNumberOfPublicDisorderIncidents() {
-        return numberOfPublicDisorderIncidents.get();
+    public int getNumberOfPublicDisorderFines() {
+        return localPolice.getDisorderIncidentCount();
     }
 
     public Map<String, CongestionLevel> getCongestionLevelsByStreet() {
@@ -131,12 +141,18 @@ public class CityInformationDashboard {
                 return;
             }
 
+            // Capture counts at the moment of report
+            int speedingFines = getNumberOfSpeedingFines();
+            int disorderFines = getNumberOfPublicDisorderFines();
+            List<String> dangerousStreets = getMostDangerousStreetsBySeriousReports(LIVE_DANGEROUS_STREETS_LIMIT);
+
             liveReporter.submit(() -> {
-                List<String> dangerousStreets = getMostDangerousStreetsBySeriousReports(LIVE_DANGEROUS_STREETS_LIMIT);
                 if (dangerousStreets.isEmpty()) {
                     return;
                 }
                 logger.info("[Live dangerous streets | status at report #{}] {}", reportNumber, dangerousStreets);
+                logger.info("Speeding violations: {}", speedingFines);
+                logger.info("Public disorder incidents: {}", disorderFines);
             });
         }
     }
