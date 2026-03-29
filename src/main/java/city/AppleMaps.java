@@ -1,17 +1,18 @@
 package city;
 
+import org.greenrobot.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AppleMaps extends NavigationApp {
     private static final Logger logger = LoggerFactory.getLogger(AppleMaps.class);
 
-    public AppleMaps() {
-        super("Apple Maps");
+    public AppleMaps(EventBus eventBus) {
+        super(eventBus, "Apple Maps");
     }
 
-    public AppleMaps(boolean debugMode) {
-        super("Apple Maps", debugMode);
+    public AppleMaps(EventBus eventBus, boolean debugMode) {
+        super(eventBus, "Apple Maps", debugMode);
     }
 
     @Override

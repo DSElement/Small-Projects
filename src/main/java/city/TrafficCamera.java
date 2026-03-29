@@ -5,15 +5,15 @@ import org.greenrobot.eventbus.EventBus;
 public class TrafficCamera {
     private final EventBus eventBus;
     private final String streetName;
-    private CongestionLevel congestionLevel;
+    private CongestionLevelEnum congestionLevel;
 
-    public TrafficCamera(EventBus eventBus, String streetName, CongestionLevel congestionLevel) {
+    public TrafficCamera(EventBus eventBus, String streetName, CongestionLevelEnum congestionLevel) {
         this.eventBus = eventBus;
         this.streetName = streetName;
         this.congestionLevel = congestionLevel;
     }
 
-    public void updateCongestionLevel(CongestionLevel newLevel) {
+    public void updateCongestionLevel(CongestionLevelEnum newLevel) {
         if (newLevel == null) {
             throw new IllegalArgumentException("Congestion level must not be null");
         }

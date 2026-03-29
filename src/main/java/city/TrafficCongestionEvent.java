@@ -1,14 +1,14 @@
 package city;
 
 public class TrafficCongestionEvent extends CityEvent {
-    private final CongestionLevel congestionLevel;
+    private final CongestionLevelEnum congestionLevel;
 
-    public TrafficCongestionEvent(String streetName, CongestionLevel congestionLevel) {
+    public TrafficCongestionEvent(String streetName, CongestionLevelEnum congestionLevel) {
         super(streetName);
         this.congestionLevel = congestionLevel;
     }
 
-    public CongestionLevel getCongestionLevel() {
+    public CongestionLevelEnum getCongestionLevel() {
         return congestionLevel;
     }
 }

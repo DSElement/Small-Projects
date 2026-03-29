@@ -1,6 +1,6 @@
 package city;
 
-public enum CongestionLevel {
+public enum CongestionLevelEnum {
     VERY_LOW,
     LOW,
     MODERATE,

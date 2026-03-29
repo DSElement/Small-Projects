@@ -1,5 +1,6 @@
 package city;
 
+import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +13,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class LocalPolice {
     private static final Logger logger = LoggerFactory.getLogger(LocalPolice.class);
 
+    private final EventBus eventBus;
     private final AtomicInteger disorderIncidentCounter;
     private final List<PublicDisorderEvent> disorderIncidents;
 
-    public LocalPolice() {
+    public LocalPolice(EventBus eventBus) {
+        this.eventBus = eventBus;
         this.disorderIncidentCounter = new AtomicInteger(0);
         this.disorderIncidents = Collections.synchronizedList(new ArrayList<>());
     }
@@ -30,6 +33,8 @@ public class LocalPolice {
         int count = disorderIncidentCounter.incrementAndGet();
         logger.debug("Public disorder incident recorded at {}: {}. Total incidents: {}",
                      event.getStreetName(), event.getDisorderDescription(), count);
+
+        eventBus.post(new InformationDashboardEvent(event.getStreetName(), CityEventEnum.PUBLIC_DISORDER));
     }
 
     public int getDisorderIncidentCount() {

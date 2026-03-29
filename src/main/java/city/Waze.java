@@ -1,17 +1,18 @@
 package city;
 
+import org.greenrobot.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Waze extends NavigationApp {
     private static final Logger logger = LoggerFactory.getLogger(Waze.class);
 
-    public Waze() {
-        super("Waze");
+    public Waze(EventBus eventBus) {
+        super(eventBus, "Waze");
     }
 
-    public Waze(boolean debugMode) {
-        super("Waze", debugMode);
+    public Waze(EventBus eventBus, boolean debugMode) {
+        super(eventBus, "Waze", debugMode);
     }
 
     @Override

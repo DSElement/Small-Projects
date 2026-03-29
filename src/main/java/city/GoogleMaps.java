@@ -1,17 +1,18 @@
 package city;
 
+import org.greenrobot.eventbus.EventBus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class GoogleMaps extends NavigationApp {
     private static final Logger logger = LoggerFactory.getLogger(GoogleMaps.class);
 
-    public GoogleMaps() {
-        super("Google Maps");
+    public GoogleMaps(EventBus eventBus) {
+        super(eventBus, "Google Maps");
     }
 
-    public GoogleMaps(boolean debugMode) {
-        super("Google Maps", debugMode);
+    public GoogleMaps(EventBus eventBus, boolean debugMode) {
+        super(eventBus, "Google Maps", debugMode);
     }
 
     @Override

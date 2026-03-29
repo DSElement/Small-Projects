@@ -5,11 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -19,18 +17,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CityInformationDashboard {
     private static final Logger logger = LoggerFactory.getLogger(CityInformationDashboard.class);
     private static final int LIVE_REPORT_FREQUENCY = 3;
-    private static final int LIVE_DANGEROUS_STREETS_LIMIT = 3;
 
     private final TrafficPolice trafficPolice;
     private final LocalPolice localPolice;
-    private final AtomicInteger seriousReportsCounter;
-    private final Map<String, CongestionLevel> congestionLevelsByStreet;
+    private AtomicInteger liveReportCounter;
+    private AtomicInteger lastReportedCount;
+    private final Map<String, CongestionLevelEnum> congestionLevelsByStreet;
     private final Map<String, AtomicInteger> issuesByStreet;
-    private final Map<String, AtomicInteger> seriousIssuesByStreet;
     private final ExecutorService liveReporter;
-    private final Object liveReportTriggerLock;
-    private final Random random;
-    private final boolean debugMode;
 
     public CityInformationDashboard(TrafficPolice trafficPolice, LocalPolice localPolice) {
         this(trafficPolice, localPolice, false);
@@ -39,53 +33,53 @@ public class CityInformationDashboard {
     public CityInformationDashboard(TrafficPolice trafficPolice, LocalPolice localPolice, boolean debugMode) {
         this.trafficPolice = trafficPolice;
         this.localPolice = localPolice;
-        this.debugMode = debugMode;
-        this.seriousReportsCounter = new AtomicInteger(0);
+        this.liveReportCounter = new AtomicInteger(0);
+        this.lastReportedCount = new AtomicInteger(0);
         this.congestionLevelsByStreet = new ConcurrentHashMap<>();
         this.issuesByStreet = new ConcurrentHashMap<>();
-        this.seriousIssuesByStreet = new ConcurrentHashMap<>();
         this.liveReporter = Executors.newSingleThreadExecutor();
-        this.liveReportTriggerLock = new Object();
-        this.random = new Random();
     }
 
     @Subscribe
-    public void onSpeedViolation(SpeedViolationEvent event) {
+    public void onInformationDashboardEvent(InformationDashboardEvent event) {
         if (event == null) {
-            logger.warn("Received null SpeedViolationEvent");
+            logger.warn("Received null InformationDashboardEvent");
             return;
         }
-        issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
-        registerSeriousIssueAndMaybeReport(event.getStreetName());
-        if (debugMode) {
-            logger.info("Speed violation detected on {} at speed {} km/h. License plate: {}",
-                       event.getStreetName(), event.getRecordedSpeed(), event.getPlateNumber());
+        
+        if (event.getEventType() == null) {
+            logger.warn("Received InformationDashboardEvent with null event type");
+            return;
         }
-    }
 
-    @Subscribe
-    public void onPublicDisorder(PublicDisorderEvent event) {
-        if (event == null) {
-            logger.warn("Received null PublicDisorderEvent");
+        if (event.getEventType() == CityEventEnum.TRAFFIC_CONGESTION) {
+            return; // Congestion events are handled by navigation apps, not counted as issues
+        } else if (event.getEventType() == CityEventEnum.PUBLIC_DISORDER) {
+            issuesByStreet.computeIfAbsent(event.getStreetName(), k -> new AtomicInteger(0)).incrementAndGet();
+        } else if (event.getEventType() == CityEventEnum.SPEEDING_VIOLATION) {
+            issuesByStreet.computeIfAbsent(event.getStreetName(), k -> new AtomicInteger(0)).incrementAndGet();
+        } else {
+            logger.warn("Received InformationDashboardEvent with unknown event type: {}", event.getEventType());
             return;
         }
-        issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
-        registerSeriousIssueAndMaybeReport(event.getStreetName());
-        if (debugMode) {
-            logger.info("Public disorder detected at {}: {}", event.getStreetName(), event.getDisorderDescription());
-        }
-    }
 
-    @Subscribe
-    public void onTrafficCongestion(TrafficCongestionEvent event) {
-        if (event == null) {
-            logger.warn("Received null TrafficCongestionEvent");
-            return;
-        }
-        congestionLevelsByStreet.put(event.getStreetName(), event.getCongestionLevel());
-        issuesByStreet.computeIfAbsent(event.getStreetName(), street -> new AtomicInteger(0)).incrementAndGet();
-        if (debugMode) {
-            logger.info("Traffic congestion updated on {}: {}", event.getStreetName(), event.getCongestionLevel());
+        synchronized (this) {
+            int count = liveReportCounter.incrementAndGet();
+            int lastCount = lastReportedCount.get();
+            if (count - lastCount >= LIVE_REPORT_FREQUENCY) {
+                lastReportedCount.set(count);
+                int disorderCount = localPolice.getDisorderIncidentCount();
+                int speedingCount = trafficPolice.getSpeedingViolationCount();
+                liveReporter.submit(() -> {
+                    logger.info("Live report: {} public disorder incidents, {} speeding violations",
+                                disorderCount, speedingCount);
+
+                    if (count % (LIVE_REPORT_FREQUENCY * 3) == 0) {
+                        List<String> dangerousNeighborhoods = getMostDangerousNeighborhoods(3);
+                        logger.info("Most dangerous neighborhoods: {}", dangerousNeighborhoods);
+                    }
+                });
+            }
         }
     }
 
@@ -97,7 +91,7 @@ public class CityInformationDashboard {
         return localPolice.getDisorderIncidentCount();
     }
 
-    public Map<String, CongestionLevel> getCongestionLevelsByStreet() {
+    public Map<String, CongestionLevelEnum> getCongestionLevelsByStreet() {
         return Map.copyOf(congestionLevelsByStreet);
     }
 
@@ -127,54 +121,6 @@ public class CityInformationDashboard {
         } catch (InterruptedException ex) {
             liveReporter.shutdownNow();
             Thread.currentThread().interrupt();
-        }
-    }
-
-    private void registerSeriousIssueAndMaybeReport(String streetName) {
-        synchronized (liveReportTriggerLock) {
-            seriousIssuesByStreet
-                .computeIfAbsent(streetName, ignored -> new AtomicInteger(0))
-                .incrementAndGet();
-
-            int reportNumber = seriousReportsCounter.incrementAndGet();
-            if (reportNumber % LIVE_REPORT_FREQUENCY != 0) {
-                return;
-            }
-
-            // Capture counts at the moment of report
-            int speedingFines = getNumberOfSpeedingFines();
-            int disorderFines = getNumberOfPublicDisorderFines();
-            List<String> dangerousStreets = getMostDangerousStreetsBySeriousReports(LIVE_DANGEROUS_STREETS_LIMIT);
-
-            liveReporter.submit(() -> {
-                if (dangerousStreets.isEmpty()) {
-                    return;
-                }
-                logger.info("[Live dangerous streets | status at report #{}] {}", reportNumber, dangerousStreets);
-                logger.info("Speeding violations: {}", speedingFines);
-                logger.info("Public disorder incidents: {}", disorderFines);
-            });
-        }
-    }
-
-    private List<String> getMostDangerousStreetsBySeriousReports(int limit) {
-        if (limit <= 0) {
-            return List.of();
-        }
-
-        synchronized (liveReportTriggerLock) {
-            List<Map.Entry<String, AtomicInteger>> sorted = new ArrayList<>(seriousIssuesByStreet.entrySet());
-            sorted.sort(Comparator.comparingInt((Map.Entry<String, AtomicInteger> entry) -> entry.getValue().get())
-                                  .reversed());
-
-            List<String> result = new ArrayList<>();
-            int count = Math.min(limit, sorted.size());
-            for (int i = 0; i < count; i++) {
-                result.add(sorted.get(i).getKey());
-            }
-
-            Collections.shuffle(result, random);
-            return result;
         }
     }
 }

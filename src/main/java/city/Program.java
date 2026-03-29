@@ -18,16 +18,16 @@ public class Program{
         EventBus eventBus = EventBus.getDefault();
         Random random = new Random();
 
-        TrafficPolice trafficPolice = new TrafficPolice();
-        LocalPolice localPolice = new LocalPolice();
+        TrafficPolice trafficPolice = new TrafficPolice(eventBus);
+        LocalPolice localPolice = new LocalPolice(eventBus);
         CityInformationDashboard dashboard = new CityInformationDashboard(trafficPolice, localPolice);
         eventBus.register(trafficPolice);
         eventBus.register(localPolice);
         eventBus.register(dashboard);
 
-        Waze waze = new Waze();
-        GoogleMaps googleMaps = new GoogleMaps();
-        AppleMaps appleMaps = new AppleMaps();
+        Waze waze = new Waze(eventBus);
+        GoogleMaps googleMaps = new GoogleMaps(eventBus);
+        AppleMaps appleMaps = new AppleMaps(eventBus);
         eventBus.register(waze);
         eventBus.register(googleMaps);
         eventBus.register(appleMaps);
@@ -39,10 +39,10 @@ public class Program{
         SurveillanceCamera surveillanceCamera1 = new SurveillanceCamera(eventBus, "Central Park");
         SurveillanceCamera surveillanceCamera2 = new SurveillanceCamera(eventBus, "Downtown Square");
         SurveillanceCamera surveillanceCamera3 = new SurveillanceCamera(eventBus, "City Hall");
-        TrafficCamera trafficCamera1 = new TrafficCamera(eventBus, "Main Street", CongestionLevel.LOW);
-        TrafficCamera trafficCamera2 = new TrafficCamera(eventBus, "Second Avenue", CongestionLevel.MODERATE);
-        TrafficCamera trafficCamera3 = new TrafficCamera(eventBus, "Third Boulevard", CongestionLevel.HIGH);
-        TrafficCamera trafficCamera4 = new TrafficCamera(eventBus, "Fourth Road", CongestionLevel.VERY_HIGH);
+        TrafficCamera trafficCamera1 = new TrafficCamera(eventBus, "Main Street", CongestionLevelEnum.LOW);
+        TrafficCamera trafficCamera2 = new TrafficCamera(eventBus, "Second Avenue", CongestionLevelEnum.MODERATE);
+        TrafficCamera trafficCamera3 = new TrafficCamera(eventBus, "Third Boulevard", CongestionLevelEnum.HIGH);
+        TrafficCamera trafficCamera4 = new TrafficCamera(eventBus, "Fourth Road", CongestionLevelEnum.VERY_HIGH);
 
         ThreadFactory namedThreadFactory = new ThreadFactory() {
             private final AtomicInteger count = new AtomicInteger(0);
@@ -127,53 +127,53 @@ public class Program{
         });
 
         executor.submit(() -> {
-            CongestionLevel[] levels = {
-                CongestionLevel.MODERATE,
-                CongestionLevel.HIGH,
-                CongestionLevel.VERY_HIGH,
-                CongestionLevel.HIGH,
-                CongestionLevel.MODERATE
+            CongestionLevelEnum[] levels = {
+                CongestionLevelEnum.MODERATE,
+                CongestionLevelEnum.HIGH,
+                CongestionLevelEnum.VERY_HIGH,
+                CongestionLevelEnum.HIGH,
+                CongestionLevelEnum.MODERATE
             };
-            for (CongestionLevel level : levels) {
+            for (CongestionLevelEnum level : levels) {
                 trafficCamera1.updateCongestionLevel(level);
             }
         });
 
         executor.submit(() -> {
-            CongestionLevel[] levels = {
-                CongestionLevel.LOW,
-                CongestionLevel.MODERATE,
-                CongestionLevel.HIGH,
-                CongestionLevel.VERY_HIGH,
-                CongestionLevel.HIGH
+            CongestionLevelEnum[] levels = {
+                CongestionLevelEnum.LOW,
+                CongestionLevelEnum.MODERATE,
+                CongestionLevelEnum.HIGH,
+                CongestionLevelEnum.VERY_HIGH,
+                CongestionLevelEnum.HIGH
             };
-            for (CongestionLevel level : levels) {
+            for (CongestionLevelEnum level : levels) {
                 trafficCamera2.updateCongestionLevel(level);
             }
         });
 
         executor.submit(() -> {
-            CongestionLevel[] levels = {
-                CongestionLevel.MODERATE,
-                CongestionLevel.HIGH,
-                CongestionLevel.VERY_HIGH,
-                CongestionLevel.HIGH,
-                CongestionLevel.MODERATE
+            CongestionLevelEnum[] levels = {
+                CongestionLevelEnum.MODERATE,
+                CongestionLevelEnum.HIGH,
+                CongestionLevelEnum.VERY_HIGH,
+                CongestionLevelEnum.HIGH,
+                CongestionLevelEnum.MODERATE
             };
-            for (CongestionLevel level : levels) {
+            for (CongestionLevelEnum level : levels) {
                 trafficCamera3.updateCongestionLevel(level);
             }
         });
 
         executor.submit(() -> {
-            CongestionLevel[] levels = {
-                CongestionLevel.LOW,
-                CongestionLevel.MODERATE,
-                CongestionLevel.HIGH,
-                CongestionLevel.VERY_HIGH,
-                CongestionLevel.HIGH
+            CongestionLevelEnum[] levels = {
+                CongestionLevelEnum.LOW,
+                CongestionLevelEnum.MODERATE,
+                CongestionLevelEnum.HIGH,
+                CongestionLevelEnum.VERY_HIGH,
+                CongestionLevelEnum.HIGH
             };
-            for (CongestionLevel level : levels) {
+            for (CongestionLevelEnum level : levels) {
                 trafficCamera4.updateCongestionLevel(level);
             }
         });
