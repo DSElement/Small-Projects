@@ -21,6 +21,7 @@ public abstract class NavigationApp {
     @Subscribe
     public void onTrafficCongestion(TrafficCongestionEvent event) {
         update(event);
+        reportCongestion(appName, event.getCongestionLevel());
     }
 
     public abstract void update(TrafficCongestionEvent event);
