@@ -34,8 +34,13 @@ alt High Speed Detected
     Dashboard -> Dashboard: liveReportCounter.increment()
     
     alt Report Frequency Threshold Reached (every 3 events)
+        Dashboard -> Police: getSpeedingViolationCount()
+        activate Police
+        Police --> Dashboard: return count
+        deactivate Police
+        
         Dashboard -> Dashboard: liveReporter.submit(report task)
-        Dashboard -> Dashboard: log live statistics
+        Dashboard -> Dashboard: log: "{speedingCount} speeding violations"
     end
     deactivate Dashboard
     
