@@ -1,0 +1,51 @@
+@startuml Speed Camera Detection Flow
+participant "Speed Camera" as Camera
+participant "EventBus" as Bus
+participant "Traffic Police" as Police
+participant "City Dashboard" as Dashboard
+
+Camera -> Camera: checkForSpeeding(speed, plate)
+activate Camera
+Camera -> Camera: if speed > speedLimit + 5
+
+alt High Speed Detected
+    Camera -> Camera: create SpeedViolationEvent\n(street, speed, plate)
+    Camera -> Bus: post(SpeedViolationEvent)
+    deactivate Camera
+    
+    activate Bus
+    Bus -> Police: @Subscribe onSpeedViolation(event)
+    deactivate Bus
+    
+    activate Police
+    Police -> Police: speedingViolations.add(event)
+    Police -> Police: speedingViolationCounter.incrementAndGet()
+    Police -> Police: log: speed violation recorded
+    Police -> Police: create InformationDashboardEvent\n(SPEEDING_VIOLATION)
+    Police -> Bus: post(InformationDashboardEvent)
+    deactivate Police
+    
+    activate Bus
+    Bus -> Dashboard: @Subscribe onInformationDashboardEvent(event)
+    deactivate Bus
+    
+    activate Dashboard
+    Dashboard -> Dashboard: issuesByStreet.increment(street)
+    Dashboard -> Dashboard: liveReportCounter.increment()
+    
+    alt Report Frequency Threshold Reached (every 3 events)
+        Dashboard -> Police: getSpeedingViolationCount()
+        activate Police
+        Police --> Dashboard: return count
+        deactivate Police
+        
+        Dashboard -> Dashboard: liveReporter.submit(report task)
+        Dashboard -> Dashboard: log: "{speedingCount} speeding violations"
+    end
+    deactivate Dashboard
+    
+else Speed Within Limit
+    Camera -> Camera: return
+    deactivate Camera
+end
+@enduml
