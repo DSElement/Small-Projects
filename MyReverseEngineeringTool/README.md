@@ -229,7 +229,3 @@ src/
     ├── testfixtures/              # Sample classes used in tests
     └── testutil/                  # Test helper utilities
 ```
-
-## License
-
-This project is not currently licensed. All rights reserved.
