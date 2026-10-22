@@ -1,64 +1,65 @@
-# Smart City Surveillance System
+# Smart City Surveillance
 
-An event-driven architecture simulation of a city surveillance system using Greenrobot EventBus with concurrent cameras and real-time event processing.
+A Java 21 console simulation of event-driven city monitoring. Independent camera tasks publish typed events through Greenrobot EventBus; police subscribers record incidents, navigation subscribers react to congestion, and a dashboard logs aggregate reports.
 
-## Overview
+This coursework project demonstrates publish/subscribe communication and concurrency. Observations are generated in code. Waze, Google Maps, and Apple Maps are simulated subscribers, with no connection to their real services.
 
-The system simulates three types of surveillance cameras that publish events to subscribers:
+## Event flow
 
-| Camera Type | Event Type | Publishers | Subscribers |
-|---|---|---|---|
-| **Speed Cameras** | SpeedViolationEvent | 4 cameras | Traffic Police |
-| **Traffic Cameras** | TrafficCongestionEvent | 4 cameras | Navigation Apps (Waze, Google Maps, Apple Maps) |
-| **Surveillance Cameras** | PublicDisorderEvent | 3 cameras | Local Police |
+| Publisher | Event | Subscribers and result |
+| --- | --- | --- |
+| Four speed cameras | `SpeedViolationEvent` | Traffic police record vehicles exceeding the local limit by more than 5 km/h, then notify the dashboard. |
+| Three surveillance cameras | `PublicDisorderEvent` | Local police record simulated incidents, then notify the dashboard. |
+| Four traffic cameras | `TrafficCongestionEvent` | Three navigation subscribers log changed congestion levels and notify the dashboard. |
+| Police and navigation subscribers | `InformationDashboardEvent` | The dashboard counts speeding/disorder issues per location and queues reports; congestion notifications are currently ignored. |
 
-All cameras run concurrently in separate threads and publish events through an EventBus for subscribers to handle.
+`Program` registers subscribers, submits eleven camera tasks to a fixed thread pool, waits for completion, drains the dashboard reporter, and unregisters subscribers. EventBus handlers use default posting-thread delivery: they execute on the publishing camera threads. The dashboard uses a separate single-thread executor for reports.
 
-## Technology Stack
+Atomic counters, synchronized incident lists, and concurrent maps support concurrent updates. Reports are requested after every three counted issues; a location ranking is requested at every ninth issue. Random observations make counts and log ordering vary between runs.
 
-- **Java 21** + Maven
-- **Greenrobot EventBus 3.3.1** - lightweight pub/sub event bus
-- **SLF4J + Logback** - logging
-- **ExecutorService** - concurrent thread management
+## Requirements
 
-## Build & Run
+- JDK 21 or later, with `java` and `javac` available.
+- Apache Maven, with dependency access for the first build.
 
-```bash
-# Build
+Dependencies in `pom.xml`: Greenrobot EventBus 3.3.1, SLF4J 2.0.9, and Logback 1.4.11. Maven Shade includes dependencies in the executable JAR.
+
+## Build and run
+
+From this directory:
+
+```sh
 mvn clean package
-
-# Run
 java -jar target/smart-city-surveillance-1.0-SNAPSHOT.jar
 ```
 
-## Project Structure
+From the Small-Projects root:
 
-```
-src/main/java/city/
-├── Program.java                 # Main entry point
-├── CityEvent.java              # Base event class
-├── SpeedCamera.java            # Speed violation publisher
-├── TrafficCamera.java          # Traffic congestion publisher
-├── SurveillanceCamera.java     # Public disorder publisher
-├── TrafficPolice.java          # Speed event subscriber
-├── LocalPolice.java            # Disorder event subscriber
-├── Waze.java, GoogleMaps.java, AppleMaps.java  # Traffic subscribers
-└── CityInformationDashboard.java  # All-events subscriber
+```sh
+mvn -f SmartCitySurveillanceSystem/pom.xml clean package
+java -jar SmartCitySurveillanceSystem/target/smart-city-surveillance-1.0-SNAPSHOT.jar
 ```
 
-## How It Works
+The program performs one finite simulation and exits automatically. Output goes to the console; `src/main/resources/logback.xml` controls verbosity. INFO shows dashboard reports and shutdown messages; individual police records use DEBUG. No database, broker, camera hardware, credentials, or external API is required at runtime.
 
-1. Creates 11 cameras across the city (4 speed, 4 traffic, 3 surveillance)
-2. Spawns 11 concurrent threads, one per camera
-3. Each camera publishes simulated events to the EventBus
-4. Subscribers receive relevant events and process them
-5. Dashboard aggregates statistics (fines issued, dangerous neighborhoods)
+## Source layout
 
-## Features
+- `src/main/java/city/Program.java`: wiring, observations, task execution, and shutdown.
+- `*Camera.java` and `*Event.java`: publishers and event payloads.
+- `TrafficPolice.java`, `LocalPolice.java`: incident recording and notifications.
+- `NavigationApp.java`, `Waze.java`, `GoogleMaps.java`, `AppleMaps.java`: navigation subscriber abstraction and implementations.
+- `CityInformationDashboard.java`: counters, location rankings, and report scheduling.
+- `sequence_diagram_code.txt`: diagram source.
+- `sequence_diagram_speed_camera.png`: rendered speed-camera sequence.
 
-✅ Event-driven architecture with loose coupling
-✅ Multi-threaded concurrent camera operations (bonus requirement)
-✅ Real-time event processing
-✅ Scalable - add new subscribers without modifying existing code
+![Speed-camera event sequence](sequence_diagram_speed_camera.png)
 
-See `sequence_diagram_speed_camera.png` for detailed event flow sequence diagram.
+## Scope and limitations
+
+- All components run inside one JVM; communication uses an in-process event bus.
+- There is no video processing, live surveillance, map routing, persistent storage, or graphical dashboard.
+- The dashboard's congestion map is never populated, and congestion notifications do not contribute to issue counts.
+- Incident-list getters copy synchronized lists without explicitly locking around the copy; concurrent snapshot safety has not been established.
+- No automated tests are included. A successful Maven build verifies compilation and packaging, not concurrency correctness.
+
+This directory is the portfolio copy of `PASSC/Smart City Surveillance`. Source, Maven configuration, and diagrams are retained. Nested Git history and generated `target/` output are excluded from the copy; build products and local editor artifacts are ignored.

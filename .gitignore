@@ -1,0 +1,50 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Maven / .NET build output
+target/
+bin/
+obj/
+*.class
+dependency-reduced-pom.xml
+
+# Native build output; retain source and benchmark evidence
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+
+# Local editor / OS state
+.idea/
+.vscode/
+.vs/
+*.iml
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+~$*
+
+# Local credentials; retain authored templates
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Merit workbooks contain personal academic data
+/Excel Merit Sheet Merger/*.xlsx
+/Excel Merit Sheet Merger/*.xls

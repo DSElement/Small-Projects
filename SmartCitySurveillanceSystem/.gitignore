@@ -1,1 +1,16 @@
-target 
+# Maven output
+/target/
+/dependency-reduced-pom.xml
+*.class
+*.log
+
+# Local IDE configuration
+/.idea/
+/.vscode/
+/.settings/
+/.project
+/.classpath
+*.iml
+
+# Local Java upgrade assistant artifacts
+/.github/java-upgrade/
